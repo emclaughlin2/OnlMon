@@ -3,6 +3,8 @@
 
 #include <string>
 
+class TPad;
+
 class OnlMonDraw
 {
  public:
@@ -18,6 +20,7 @@ class OnlMonDraw
   int Verbosity() const { return verbosity; }
 
  protected:
+  virtual int DrawDeadServer(TPad *transparent);
   std::string ThisName;
   int verbosity = 0;
 };

@@ -13,8 +13,6 @@
 #include <sstream>
 #include <vector>
 
-using namespace std;
-
 OnlMonTrigger::OnlMonTrigger()
   : MyRunNumber(-2)
   , MyRunNumberBit(-2)

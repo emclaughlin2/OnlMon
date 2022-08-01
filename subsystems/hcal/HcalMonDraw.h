@@ -27,7 +27,6 @@ class HcalMonDraw : public OnlMonDraw
   int DrawFirst(const std::string &what = "ALL");
   int DrawSecond(const std::string &what = "ALL");
   int DrawHistory(const std::string &what = "ALL");
-  int DrawDeadServer(TPad *transparent);
   int TimeOffsetTicks = -1;
   TCanvas *TC[3] = {nullptr};
   TPad *transparent[3] = {nullptr};

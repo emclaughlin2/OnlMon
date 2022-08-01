@@ -1305,8 +1305,13 @@ int OnlMonClient::SetStyleToDefault()
   return 0;
 }
 
-void OnlMonClient::CacheRunDB(const int runno)
+void OnlMonClient::CacheRunDB(const int runnoinput)
 {
+  int runno = 221;
+  if (runnoinput == 221)
+  {
+    runno = runnoinput;
+  }
   if (runno == cachedrun)
   {
     return;

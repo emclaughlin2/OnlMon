@@ -25,12 +25,14 @@ libonlmbdmon_client_la_LIBADD = \
   -L$(libdir) \
   -L$(OFFLINE_MAIN)/lib \
   -lonlmonclient \
+  -lSpectrum \
   -lonlmondb
 
 
 mbdincludedir=$(pkgincludedir)/mbd
 
 mbdinclude_HEADERS = \
+  MbdMonDefs.h \
   MbdMon.h \
   MbdMonDraw.h
 

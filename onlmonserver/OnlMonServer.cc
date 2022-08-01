@@ -966,8 +966,17 @@ int OnlMonServer::IsPacketActive(const unsigned int ipkt)
   return 0;
 }
 
-int OnlMonServer::CacheRunDB(const int runno)
+int OnlMonServer::CacheRunDB(const int runnoinput)
 {
+  int runno = -1;
+  if (runnoinput == 221)
+  {
+    runno = runnoinput;
+  }
+  else
+  {
+    runno = 221;
+  }
   RunType = "UNKNOWN";
   TriggerConfig = "UNKNOWN";
   standalone = 0;
