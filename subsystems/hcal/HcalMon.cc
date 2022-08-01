@@ -189,7 +189,7 @@ int HcalMon::process_event(Event *e /* evt */)
     {
       dbvars->SetVar("hcalmoncount", (float) evtcnt, 0.1 * evtcnt, (float) evtcnt);
       dbvars->SetVar("hcalmondummy", sin((double) evtcnt), cos((double) se->Trigger()), (float) evtcnt);
-      dbvars->SetVar("hcalmonnew", (float) se->Trigger(), 10000. / se->CurrentTicks(), (float) evtcnt);
+      // dbvars->SetVar("hcalmonnew", (float) se->Trigger(), 10000. / se->CurrentTicks(), (float) evtcnt);
       dbvars->DBcommit();
     }
     std::ostringstream msg;
@@ -213,13 +213,13 @@ int HcalMon::DBVarInit()
 {
   // variable names are not case sensitive
   
-  std::string varname;
-  varname = "hcalmoncount";
-  dbvars->registerVar(varname);
-  varname = "hcalmondummy";
-  dbvars->registerVar(varname);
-  varname = "hcalmonnew";
-  dbvars->registerVar(varname);
+   std::string varname;
+   varname = "hcalmoncount";
+   dbvars->registerVar(varname);
+   varname = "hcalmondummy";
+   dbvars->registerVar(varname);
+  // varname = "hcalmonval_0_63";
+  // dbvars->registerVar(varname);
   if (verbosity > 0)
   {
     dbvars->Print();

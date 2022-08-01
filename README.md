@@ -1,5 +1,8 @@
 # OnlMon
 
+[![Build Status](https://web.sdcc.bnl.gov/jenkins-sphenix/buildStatus/icon?job=sPHENIX%2FsPHENIX_OnlMon_MasterBranch)](https://web.sdcc.bnl.gov/jenkins-sphenix/job/sPHENIX/job/sPHENIX_OnlMon_MasterBranch/)
+
+
 To build it, create a build area and run
 
 \<srcdir\>/autogen.sh --prefix=\<installdir\>
@@ -30,5 +33,3 @@ exampleDrawInit()
 
 exampleDraw()
 
-
-[![Build Status](https://web.sdcc.bnl.gov/jenkins-sphenix/buildStatus/icon?job=sPHENIX%2FsPHENIX_OnlMon_MasterBranch)](https://web.sdcc.bnl.gov/jenkins-sphenix/job/sPHENIX/job/sPHENIX_OnlMon_MasterBranch/)
