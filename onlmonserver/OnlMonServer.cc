@@ -371,12 +371,12 @@ int OnlMonServer::BeginRun(const int runno)
     onltrig->RunNumber(runno);
   }
 
-  i = CacheRunDB(runno);
-  if (i)
-  {
-    printf("bad return code from CacheRunDB(%d): %d\n", runno, i);
-    i = 0;
-  }
+//  i = CacheRunDB(runno);
+//  if (i)
+//  {
+//    printf("bad return code from CacheRunDB(%d): %d\n", runno, i);
+//    i = 0;
+//  }
 
   std::vector<OnlMon *>::iterator iter;
   activepacketsinit = 0;

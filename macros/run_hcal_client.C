@@ -10,8 +10,9 @@ void hcalDrawInit(const int online = 0)
 {
   OnlMonClient *cl = OnlMonClient::instance();
   // register histos we want with monitor name
-  cl->registerHisto("hcalmon_hist1", "HCALMON");
-  cl->registerHisto("hcalmon_hist2", "HCALMON");
+  cl->registerHisto("h2_hcal_hits", "HCALMON");
+  cl->registerHisto("h2_hcal_mean", "HCALMON");
+  cl->registerHisto("h2_hcal_history", "HCALMON");
   cl->AddServerHost("localhost");   // check local host first
   CreateHostList(online);
   // get my histos from server, the second parameter = 1

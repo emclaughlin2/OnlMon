@@ -7,6 +7,7 @@ class Event;
 class OnlMonDB;
 class TH1;
 class TH2;
+class Packet;
 
 class HcalMon : public OnlMon
 {
@@ -18,14 +19,16 @@ class HcalMon : public OnlMon
   int Init();
   int BeginRun(const int runno);
   int Reset();
+  double getSignal(Packet *p, const int channel);
 
  protected:
   int DBVarInit();
   int evtcnt = 0;
   int idummy = 0;
   OnlMonDB *dbvars = nullptr;
-  TH1 *hcalhist1 = nullptr;
-  TH2 *hcalhist2 = nullptr;
+  TH2 *h2_hcal_hits = nullptr;
+  TH2 *h2_hcal_mean = nullptr;
+  TH2 *h2_hcal_history = nullptr;
 };
 
 #endif /* HCAL_HCALMON_H */
