@@ -41,7 +41,7 @@ fi
 
 if [[ -z "$ONLMON_HTMLDIR" ]]
 then
-  export ONLMON_HTMLDIR=`pwd`
+  export ONLMON_HTMLDIR=/sphenix/WWW/subsystem/OnlMonHtmlTest
 fi
 
 

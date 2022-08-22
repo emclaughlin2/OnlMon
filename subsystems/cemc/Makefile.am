@@ -32,10 +32,14 @@ cemcincludedir=$(pkgincludedir)/cemc
 
 cemcinclude_HEADERS = \
   CemcMon.h \
-  CemcMonDraw.h
+  CemcMonDraw.h \
+  runningMean.h
 
 libonlcemcmon_server_la_SOURCES = \
-  CemcMon.cc
+  CemcMon.cc \
+  runningMean.cc \
+  pseudoRunningMean.cc \
+  fullRunningMean.cc
 
 libonlcemcmon_client_la_SOURCES = \
   CemcMonDraw.cc

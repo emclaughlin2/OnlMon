@@ -10,6 +10,7 @@
 #include <TDatime.h>
 #include <TGraphErrors.h>
 #include <TH1.h>
+#include <TH2.h>
 #include <TPad.h>
 #include <TROOT.h>
 #include <TSystem.h>
@@ -18,7 +19,7 @@
 #include <cstring>  // for memset
 #include <ctime>
 #include <fstream>
-#include <iostream>  // for operator<<, basic_ostream, basic_os...
+#include <iostream>
 #include <sstream>
 #include <vector>  // for vector
 
@@ -28,31 +29,32 @@ CemcMonDraw::CemcMonDraw(const std::string &name)
   // this TimeOffsetTicks is neccessary to get the time axis right
   TDatime T0(2003, 01, 01, 00, 00, 00);
   TimeOffsetTicks = T0.Convert();
-  dbvars = new OnlMonDB(ThisName);
+  //dbvars = new OnlMonDB(ThisName);
   return;
 }
 
 int CemcMonDraw::Init()
 {
+  // deadChannelsText = new TPaveText(0.25,0.45,0.75,0.95,"br");
+  // deadChannelStatus = 0;
+
   return 0;
 }
 
 int CemcMonDraw::MakeCanvas(const std::string &name)
 {
   OnlMonClient *cl = OnlMonClient::instance();
-  int xsize = cl->GetDisplaySizeX();
-  int ysize = cl->GetDisplaySizeY();
-  if (name == "CemcMon1")
+  int xsize = cl->GetDisplaySizeX()-200;
+  int ysize = cl->GetDisplaySizeY()-200;
+  if (name == "Standard")
   {
     // xpos (-1) negative: do not draw menu bar
-    TC[0] = new TCanvas(name.c_str(), "CemcMon Example Monitor", -1, 0, xsize / 2, ysize);
-    // root is pathetic, whenever a new TCanvas is created root piles up
-    // 6kb worth of X11 events which need to be cleared with
-    // gSystem->ProcessEvents(), otherwise your process will grow and
-    // grow and grow but will not show a definitely lost memory leak
+    TC[0] = new TCanvas(name.c_str(), "CemcMonitor Standard", -1, 0, xsize / 2, ysize);
+
     gSystem->ProcessEvents();
-    Pad[0] = new TPad("cemcpad1", "who needs this?", 0.1, 0.5, 0.9, 0.9, 0);
-    Pad[1] = new TPad("cemcpad2", "who needs this?", 0.1, 0.05, 0.9, 0.45, 0);
+                                       // xlow ylow  xup  yup 
+    Pad[0] = new TPad("hitmap", "hitmap",           0.05,  0.05,  0.5, 0.7, 0);
+    Pad[1] = new TPad("RunningMean", "RunningMean", 0.5,  0.05,  0.95,  0.7, 0);
     Pad[0]->Draw();
     Pad[1]->Draw();
     // this one is used to plot the run number on the canvas
@@ -61,35 +63,36 @@ int CemcMonDraw::MakeCanvas(const std::string &name)
     transparent[0]->Draw();
     TC[0]->SetEditable(0);
   }
-  else if (name == "CemcMon2")
-  {
-    // xpos negative: do not draw menu bar
-    TC[1] = new TCanvas(name.c_str(), "CemcMon2 Example Monitor", -xsize / 2, 0, xsize / 2, ysize);
-    gSystem->ProcessEvents();
-    Pad[2] = new TPad("cemcpad3", "who needs this?", 0.1, 0.5, 0.9, 0.9, 0);
-    Pad[3] = new TPad("cemcpad4", "who needs this?", 0.1, 0.05, 0.9, 0.45, 0);
-    Pad[2]->Draw();
-    Pad[3]->Draw();
-    // this one is used to plot the run number on the canvas
-    transparent[1] = new TPad("transparent1", "this does not show", 0, 0, 1, 1);
-    transparent[1]->SetFillStyle(4000);
-    transparent[1]->Draw();
-    TC[1]->SetEditable(0);
-  }
-  else if (name == "CemcMon3")
-  {
-    TC[2] = new TCanvas(name.c_str(), "CemcMon3 Example Monitor", xsize / 2, 0, xsize / 2, ysize);
-    gSystem->ProcessEvents();
-    Pad[4] = new TPad("cemcpad5", "who needs this?", 0.1, 0.5, 0.9, 0.9, 0);
-    Pad[5] = new TPad("cemcpad6", "who needs this?", 0.1, 0.05, 0.9, 0.45, 0);
-    Pad[4]->Draw();
-    Pad[5]->Draw();
-    // this one is used to plot the run number on the canvas
-    //        transparent[2] = new TPad("transparent2", "this does not show", 0, 0, 1, 1);
-    //        transparent[2]->SetFillStyle(4000);
-    //        transparent[2]->Draw();
-    //      TC[2]->SetEditable(0);
-  }
+
+  // else if (name == "CemcMon2")
+  // {
+  //   // xpos negative: do not draw menu bar
+  //   TC[1] = new TCanvas(name.c_str(), "CemcMon2 Example Monitor", -xsize / 2, 0, xsize / 2, ysize);
+  //   gSystem->ProcessEvents();
+  //   Pad[2] = new TPad("cemcpad3", "who needs this?", 0.1, 0.5, 0.9, 0.9, 0);
+  //   Pad[3] = new TPad("cemcpad4", "who needs this?", 0.1, 0.05, 0.9, 0.45, 0);
+  //   Pad[2]->Draw();
+  //   Pad[3]->Draw();
+  //   // this one is used to plot the run number on the canvas
+  //   transparent[1] = new TPad("transparent1", "this does not show", 0, 0, 1, 1);
+  //   transparent[1]->SetFillStyle(4000);
+  //   transparent[1]->Draw();
+  //   TC[1]->SetEditable(0);
+  // }
+  // else if (name == "CemcMon3")
+  // {
+  //   TC[2] = new TCanvas(name.c_str(), "CemcMon3 Example Monitor", xsize / 2, 0, xsize / 2, ysize);
+  //   gSystem->ProcessEvents();
+  //   Pad[4] = new TPad("cemcpad5", "who needs this?", 0.1, 0.5, 0.9, 0.9, 0);
+  //   Pad[5] = new TPad("cemcpad6", "who needs this?", 0.1, 0.05, 0.9, 0.45, 0);
+  //   Pad[4]->Draw();
+  //   Pad[5]->Draw();
+  //   // this one is used to plot the run number on the canvas
+  //   //        transparent[2] = new TPad("transparent2", "this does not show", 0, 0, 1, 1);
+  //   //        transparent[2]->SetFillStyle(4000);
+  //   //        transparent[2]->Draw();
+  //   //      TC[2]->SetEditable(0);
+  // }
   return 0;
 }
 
@@ -97,44 +100,61 @@ int CemcMonDraw::Draw(const std::string &what)
 {
   int iret = 0;
   int idraw = 0;
-  if (what == "ALL" || what == "FIRST")
+  if (what == "ALL" || what == "Standard")
   {
-    iret += DrawFirst(what);
+    iret += DrawStandard(what);
     idraw++;
   }
-  if (what == "ALL" || what == "SECOND")
-  {
-    iret += DrawSecond(what);
-    idraw++;
-  }
-  if (what == "ALL" || what == "HISTORY")
-  {
-    iret += DrawHistory(what);
-    idraw++;
-  }
+
+  // if (what == "ALL" || what == "SECOND")
+  // {
+  //   iret += DrawSecond(what);
+  //   idraw++;
+  // }
+  // if (what == "ALL" || what == "HISTORY")
+  // {
+  //   iret += DrawHistory(what);
+  //   idraw++;
+  // }
+
   if (!idraw)
   {
-    std::cout << PHWHERE << " Unimplemented Drawing option: " << what << std::endl;
+    // std::cout << PHWHERE << " Unimplemented Drawing option: " << what << std::endl;
     iret = -1;
   }
   return iret;
 }
 
-int CemcMonDraw::DrawFirst(const std::string & /* what */)
+int CemcMonDraw::DrawStandard(const std::string & /* what */)
 {
   OnlMonClient *cl = OnlMonClient::instance();
-  TH1 *cemcmon_hist1 = cl->getHisto("cemcmon_hist1");
-  TH1 *cemcmon_hist2 = cl->getHisto("cemcmon_hist1");
-  if (!gROOT->FindObject("CemcMon1"))
+  TH1 *cemc_occupancy_SEB00 = cl->getHisto("cemc_occupancy_SEB00");
+  TH1 *cemc_occupancy_SEB01 = cl->getHisto("cemc_occupancy_SEB01");
+
+  TH1 *cemc_runningmean_SEB00 = cl->getHisto("cemc_runningmean_SEB00");
+  TH1 *cemc_runningmean_SEB01 = cl->getHisto("cemc_runningmean_SEB01");
+  
+  TH2F *cemc_occupancy = (TH2F *) cemc_occupancy_SEB00->Clone();
+  cemc_occupancy->Add(cemc_occupancy_SEB01);
+
+  TH2F *cemc_runningmean = (TH2F *) cemc_runningmean_SEB00->Clone();
+  cemc_runningmean->Add(cemc_runningmean_SEB01);
+
+  cemc_runningmean->SetMinimum(0);
+
+
+  if (!gROOT->FindObject("Standard"))
   {
-    MakeCanvas("CemcMon1");
+    MakeCanvas("Standard");
+
   }
   TC[0]->SetEditable(1);
   TC[0]->Clear("D");
+
   Pad[0]->cd();
-  if (cemcmon_hist1)
+  if (cemc_occupancy_SEB00)
   {
-    cemcmon_hist1->DrawCopy();
+    cemc_occupancy->DrawCopy("colz");
   }
   else
   {
@@ -142,11 +162,19 @@ int CemcMonDraw::DrawFirst(const std::string & /* what */)
     TC[0]->SetEditable(0);
     return -1;
   }
+
   Pad[1]->cd();
-  if (cemcmon_hist2)
+  if (cemc_runningmean)
   {
-    cemcmon_hist2->DrawCopy();
+    cemc_runningmean->DrawCopy("colz");
   }
+  else
+  {
+    DrawDeadServer(transparent[0]);
+    TC[0]->SetEditable(0);
+    return -1;
+  }
+
   TText PrintRun;
   PrintRun.SetTextFont(62);
   PrintRun.SetTextSize(0.04);
@@ -156,63 +184,81 @@ int CemcMonDraw::DrawFirst(const std::string & /* what */)
   std::string runstring;
   time_t evttime = cl->EventTime("CURRENT");
   // fill run number and event time into string
-  runnostream << ThisName << "_1 Run " << cl->RunNumber()
+  runnostream << ThisName << " " << " Run " << cl->RunNumber()
               << ", Time: " << ctime(&evttime);
   runstring = runnostream.str();
   transparent[0]->cd();
-  PrintRun.DrawText(0.5, 1., runstring.c_str());
+  PrintRun.DrawText(0.5, 0.95, runstring.c_str());
   TC[0]->Update();
   TC[0]->Show();
   TC[0]->SetEditable(0);
   return 0;
 }
 
-int CemcMonDraw::DrawSecond(const std::string & /* what */)
-{
-  OnlMonClient *cl = OnlMonClient::instance();
-  TH1 *cemcmon_hist1 = cl->getHisto("cemcmon_hist2");
-  TH1 *cemcmon_hist2 = cl->getHisto("cemcmon_hist2");
-  if (!gROOT->FindObject("CemcMon2"))
-  {
-    MakeCanvas("CemcMon2");
-  }
-  TC[1]->SetEditable(1);
-  TC[1]->Clear("D");
-  Pad[2]->cd();
-  if (cemcmon_hist1)
-  {
-    cemcmon_hist1->DrawCopy();
-  }
-  else
-  {
-    DrawDeadServer(transparent[1]);
-    TC[1]->SetEditable(0);
-    return -1;
-  }
-  Pad[3]->cd();
-  if (cemcmon_hist2)
-  {
-    cemcmon_hist2->DrawCopy();
-  }
-  TText PrintRun;
-  PrintRun.SetTextFont(62);
-  PrintRun.SetTextSize(0.04);
-  PrintRun.SetNDC();          // set to normalized coordinates
-  PrintRun.SetTextAlign(23);  // center/top alignment
-  std::ostringstream runnostream;
-  std::string runstring;
-  time_t evttime = cl->EventTime("CURRENT");
-  // fill run number and event time into string
-  runnostream << ThisName << "_2 Run " << cl->RunNumber()
-              << ", Time: " << ctime(&evttime);
-  runstring = runnostream.str();
-  transparent[1]->cd();
-  PrintRun.DrawText(0.5, 1., runstring.c_str());
-  TC[1]->Update();
-  TC[1]->Show();
-  TC[1]->SetEditable(0);
-  return 0;
-}
+// int CemcMonDraw::DrawSecond(const std::string & /* what */)
+// {
+//   OnlMonClient *cl = OnlMonClient::instance();
+//   TH1 *cemcmon_hist1 = cl->getHisto("cemcmon_hist2");
+//   TH1 *cemcmon_hist2 = cl->getHisto("cemcmon_hist2");
+//   if (!gROOT->FindObject("CemcMon2"))
+//   {
+//     MakeCanvas("CemcMon2");
+//   }
+//   TC[1]->SetEditable(1);
+//   TC[1]->Clear("D");
+//   Pad[2]->cd();
+//   if (cemcmon_hist1)
+//   {
+//     cemcmon_hist1->DrawCopy();
+//   }
+//   else
+//   {
+//     DrawDeadServer(transparent[1]);
+//     TC[1]->SetEditable(0);
+//     return -1;
+//   }
+//   Pad[3]->cd();
+//   if (cemcmon_hist2)
+//   {
+//     cemcmon_hist2->DrawCopy();
+//   }
+//   TText PrintRun;
+//   PrintRun.SetTextFont(62);
+//   PrintRun.SetTextSize(0.04);
+//   PrintRun.SetNDC();          // set to normalized coordinates
+//   PrintRun.SetTextAlign(23);  // center/top alignment
+//   std::ostringstream runnostream;
+//   std::string runstring;
+//   time_t evttime = cl->EventTime("CURRENT");
+//   // fill run number and event time into string
+//   runnostream << ThisName << "_2 Run " << cl->RunNumber()
+//               << ", Time: " << ctime(&evttime);
+//   runstring = runnostream.str();
+//   transparent[1]->cd();
+//   PrintRun.DrawText(0.5, 1., runstring.c_str());
+//   TC[1]->Update();
+//   TC[1]->Show();
+//   TC[1]->SetEditable(0);
+//   return 0;
+// }
+
+// int CemcMonDraw::DrawDeadServer(TPad *transparentpad)
+// {
+//   transparentpad->cd();
+//   TText FatalMsg;
+//   FatalMsg.SetTextFont(62);
+//   FatalMsg.SetTextSize(0.1);
+//   FatalMsg.SetTextColor(4);
+//   FatalMsg.SetNDC();          // set to normalized coordinates
+//   FatalMsg.SetTextAlign(23);  // center/top alignment
+//   FatalMsg.DrawText(0.5, 0.9, "CEMC MONITOR");
+//   FatalMsg.SetTextAlign(22);  // center/center alignment
+//   FatalMsg.DrawText(0.5, 0.5, "SERVER");
+//   FatalMsg.SetTextAlign(21);  // center/bottom alignment
+//   FatalMsg.DrawText(0.5, 0.1, "DEAD");
+//   transparentpad->Update();
+//   return 0;
+// }
 
 int CemcMonDraw::MakePS(const std::string &what)
 {
@@ -250,14 +296,14 @@ int CemcMonDraw::MakeHtml(const std::string &what)
   cl->CanvasToPng(TC[1], pngfile);
   // Now register also EXPERTS html pages, under the EXPERTS subfolder.
 
-  std::string logfile = cl->htmlRegisterPage(*this, "For EXPERTS/Log", "log", "html");
+  std::string logfile = cl->htmlRegisterPage(*this, "EXPERTS/Log", "log", "html");
   std::ofstream out(logfile.c_str());
   out << "<HTML><HEAD><TITLE>Log file for run " << cl->RunNumber()
       << "</TITLE></HEAD>" << std::endl;
   out << "<P>Some log file output would go here." << std::endl;
   out.close();
 
-  std::string status = cl->htmlRegisterPage(*this, "For EXPERTS/Status", "status", "html");
+  std::string status = cl->htmlRegisterPage(*this, "EXPERTS/Status", "status", "html");
   std::ofstream out2(status.c_str());
   out2 << "<HTML><HEAD><TITLE>Status file for run " << cl->RunNumber()
        << "</TITLE></HEAD>" << std::endl;
@@ -267,115 +313,115 @@ int CemcMonDraw::MakeHtml(const std::string &what)
   return 0;
 }
 
-int CemcMonDraw::DrawHistory(const std::string & /* what */)
-{
-  int iret = 0;
-  // you need to provide the following vectors
-  // which are filled from the db
-  std::vector<float> var;
-  std::vector<float> varerr;
-  std::vector<time_t> timestamp;
-  std::vector<int> runnumber;
-  std::string varname = "cemcmondummy";
-  // this sets the time range from whihc values should be returned
-  time_t begin = 0;            // begin of time (1.1.1970)
-  time_t end = time(nullptr);  // current time (right NOW)
-  iret = dbvars->GetVar(begin, end, varname, timestamp, runnumber, var, varerr);
-  if (iret)
-  {
-    std::cout << PHWHERE << " Error in db access" << std::endl;
-    return iret;
-  }
-  if (!gROOT->FindObject("CemcMon3"))
-  {
-    MakeCanvas("CemcMon3");
-  }
-  // timestamps come sorted in ascending order
-  float *x = new float[var.size()];
-  float *y = new float[var.size()];
-  float *ex = new float[var.size()];
-  float *ey = new float[var.size()];
-  int n = var.size();
-  for (unsigned int i = 0; i < var.size(); i++)
-  {
-    //       std::cout << "timestamp: " << ctime(&timestamp[i])
-    // 	   << ", run: " << runnumber[i]
-    // 	   << ", var: " << var[i]
-    // 	   << ", varerr: " << varerr[i]
-    // 	   << std::endl;
-    x[i] = timestamp[i] - TimeOffsetTicks;
-    y[i] = var[i];
-    ex[i] = 0;
-    ey[i] = varerr[i];
-  }
-  Pad[4]->cd();
-  if (gr[0])
-  {
-    delete gr[0];
-  }
-  gr[0] = new TGraphErrors(n, x, y, ex, ey);
-  gr[0]->SetMarkerColor(4);
-  gr[0]->SetMarkerStyle(21);
-  gr[0]->Draw("ALP");
-  gr[0]->GetXaxis()->SetTimeDisplay(1);
-  gr[0]->GetXaxis()->SetLabelSize(0.03);
-  // the x axis labeling looks like crap
-  // please help me with this, the SetNdivisions
-  // don't do the trick
-  gr[0]->GetXaxis()->SetNdivisions(-1006);
-  gr[0]->GetXaxis()->SetTimeOffset(TimeOffsetTicks);
-  gr[0]->GetXaxis()->SetTimeFormat("%Y/%m/%d %H:%M");
-  delete[] x;
-  delete[] y;
-  delete[] ex;
-  delete[] ey;
+// int CemcMonDraw::DrawHistory(const std::string & /* what */)
+// {
+//   int iret = 0;
+//   // you need to provide the following vectors
+//   // which are filled from the db
+//   std::vector<float> var;
+//   std::vector<float> varerr;
+//   std::vector<time_t> timestamp;
+//   std::vector<int> runnumber;
+//   std::string varname = "cemcmondummy";
+//   // this sets the time range from whihc values should be returned
+//   time_t begin = 0;            // begin of time (1.1.1970)
+//   time_t end = time(nullptr);  // current time (right NOW)
+//   iret = dbvars->GetVar(begin, end, varname, timestamp, runnumber, var, varerr);
+//   if (iret)
+//   {
+//     std::cout << PHWHERE << " Error in db access" << std::endl;
+//     return iret;
+//   }
+//   if (!gROOT->FindObject("CemcMon3"))
+//   {
+//     MakeCanvas("CemcMon3");
+//   }
+//   // timestamps come sorted in ascending order
+//   float *x = new float[var.size()];
+//   float *y = new float[var.size()];
+//   float *ex = new float[var.size()];
+//   float *ey = new float[var.size()];
+//   int n = var.size();
+//   for (unsigned int i = 0; i < var.size(); i++)
+//   {
+//     //       std::cout << "timestamp: " << ctime(&timestamp[i])
+//     // 	   << ", run: " << runnumber[i]
+//     // 	   << ", var: " << var[i]
+//     // 	   << ", varerr: " << varerr[i]
+//     // 	   << std::endl;
+//     x[i] = timestamp[i] - TimeOffsetTicks;
+//     y[i] = var[i];
+//     ex[i] = 0;
+//     ey[i] = varerr[i];
+//   }
+//   Pad[4]->cd();
+//   if (gr[0])
+//   {
+//     delete gr[0];
+//   }
+//   gr[0] = new TGraphErrors(n, x, y, ex, ey);
+//   gr[0]->SetMarkerColor(4);
+//   gr[0]->SetMarkerStyle(21);
+//   gr[0]->Draw("ALP");
+//   gr[0]->GetXaxis()->SetTimeDisplay(1);
+//   gr[0]->GetXaxis()->SetLabelSize(0.03);
+//   // the x axis labeling looks like crap
+//   // please help me with this, the SetNdivisions
+//   // don't do the trick
+//   gr[0]->GetXaxis()->SetNdivisions(-1006);
+//   gr[0]->GetXaxis()->SetTimeOffset(TimeOffsetTicks);
+//   gr[0]->GetXaxis()->SetTimeFormat("%Y/%m/%d %H:%M");
+//   delete[] x;
+//   delete[] y;
+//   delete[] ex;
+//   delete[] ey;
 
-  varname = "cemcmoncount";
-  iret = dbvars->GetVar(begin, end, varname, timestamp, runnumber, var, varerr);
-  if (iret)
-  {
-    std::cout << PHWHERE << " Error in db access" << std::endl;
-    return iret;
-  }
-  x = new float[var.size()];
-  y = new float[var.size()];
-  ex = new float[var.size()];
-  ey = new float[var.size()];
-  n = var.size();
-  for (unsigned int i = 0; i < var.size(); i++)
-  {
-    //       std::cout << "timestamp: " << ctime(&timestamp[i])
-    // 	   << ", run: " << runnumber[i]
-    // 	   << ", var: " << var[i]
-    // 	   << ", varerr: " << varerr[i]
-    // 	   << std::endl;
-    x[i] = timestamp[i] - TimeOffsetTicks;
-    y[i] = var[i];
-    ex[i] = 0;
-    ey[i] = varerr[i];
-  }
-  Pad[5]->cd();
-  if (gr[1])
-  {
-    delete gr[1];
-  }
-  gr[1] = new TGraphErrors(n, x, y, ex, ey);
-  gr[1]->SetMarkerColor(4);
-  gr[1]->SetMarkerStyle(21);
-  gr[1]->Draw("ALP");
-  gr[1]->GetXaxis()->SetTimeDisplay(1);
-  // TC[2]->Update();
-  //    h1->GetXaxis()->SetTimeDisplay(1);
-  //    h1->GetXaxis()->SetLabelSize(0.03);
-  gr[1]->GetXaxis()->SetLabelSize(0.03);
-  gr[1]->GetXaxis()->SetTimeOffset(TimeOffsetTicks);
-  gr[1]->GetXaxis()->SetTimeFormat("%Y/%m/%d %H:%M");
-  //    h1->Draw();
-  delete[] x;
-  delete[] y;
-  delete[] ex;
-  delete[] ey;
+//   varname = "cemcmoncount";
+//   iret = dbvars->GetVar(begin, end, varname, timestamp, runnumber, var, varerr);
+//   if (iret)
+//   {
+//     std::cout << PHWHERE << " Error in db access" << std::endl;
+//     return iret;
+//   }
+//   x = new float[var.size()];
+//   y = new float[var.size()];
+//   ex = new float[var.size()];
+//   ey = new float[var.size()];
+//   n = var.size();
+//   for (unsigned int i = 0; i < var.size(); i++)
+//   {
+//     //       std::cout << "timestamp: " << ctime(&timestamp[i])
+//     // 	   << ", run: " << runnumber[i]
+//     // 	   << ", var: " << var[i]
+//     // 	   << ", varerr: " << varerr[i]
+//     // 	   << std::endl;
+//     x[i] = timestamp[i] - TimeOffsetTicks;
+//     y[i] = var[i];
+//     ex[i] = 0;
+//     ey[i] = varerr[i];
+//   }
+//   Pad[5]->cd();
+//   if (gr[1])
+//   {
+//     delete gr[1];
+//   }
+//   gr[1] = new TGraphErrors(n, x, y, ex, ey);
+//   gr[1]->SetMarkerColor(4);
+//   gr[1]->SetMarkerStyle(21);
+//   gr[1]->Draw("ALP");
+//   gr[1]->GetXaxis()->SetTimeDisplay(1);
+//   // TC[2]->Update();
+//   //    h1->GetXaxis()->SetTimeDisplay(1);
+//   //    h1->GetXaxis()->SetLabelSize(0.03);
+//   gr[1]->GetXaxis()->SetLabelSize(0.03);
+//   gr[1]->GetXaxis()->SetTimeOffset(TimeOffsetTicks);
+//   gr[1]->GetXaxis()->SetTimeFormat("%Y/%m/%d %H:%M");
+//   //    h1->Draw();
+//   delete[] x;
+//   delete[] y;
+//   delete[] ex;
+//   delete[] ey;
 
-  TC[2]->Update();
-  return 0;
-}
+//   TC[2]->Update();
+//   return 0;
+// }

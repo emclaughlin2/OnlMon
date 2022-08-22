@@ -1,0 +1,207 @@
+body 
+{ 
+  background-color: #FFFFFF;
+  color: #000066;
+}
+
+body.contacts
+{
+ 	background-color:#FFFFDD;
+}
+
+body.menu
+{
+	background-color:green;
+}
+
+body.runselect
+{
+  background-color: #FFFFFF;
+  color:#000066;
+}
+
+#root
+{
+  font-size: 120%;	
+}
+
+a {
+	font-family:Arial, Helvetica, sans-serif;
+	font-size:84%;
+	text-decoration:none;
+	background:transparent;
+}
+
+a:hover {
+	background:yellow;
+}
+a.tracked {
+	background:blue;
+}
+a.subexpanded {
+	font-weight: bold;
+	background:transparent;
+}
+a.subclosed {
+	background:transparent;
+}
+
+frameset {
+	border-style: none;
+}
+
+frame.heading {
+	background:gray;
+	border-style: none;
+}
+
+.dir { 
+  font-size: 130%; 
+  font-family: courier, times, sans-serif; 
+  font-weight: bold; 
+  background-color: #FFFFFF;
+  color: #000066;
+}
+
+h2.dir 
+{ 
+  font-size: 100%; 
+  background-color: #FFBBDD; 
+}
+
+
+.unknowndata 
+{ 
+  text-decoration: none; 
+  background-color: #FFFFFF;
+  border-width: thin; 
+  border-style: solid; 
+  font-family: courier, times, sans-serif; 
+  font-weight: 500;
+  color: #000066;
+}
+
+.eventdata 
+{ 
+  text-decoration: none; 
+  border-width: thin; 
+  border-style: solid; 
+  font-family: courier, times, sans-serif; 
+  font-weight: 500;
+  background-color: #FFFFFF;
+  color: #006600;
+}
+
+.calibdata 
+{ 
+  text-decoration: none; 
+  border-width: thin; 
+  border-style: solid; 
+  font-family: courier, times, sans-serif; 
+  font-weight: 500;
+  background-color: #FFFFFF;
+  color: #660000;
+}
+
+.pedestaldata
+{ 
+  text-decoration: none; 
+  border-width: thin; 
+  border-style: solid; 
+  font-family: courier, times, sans-serif; 
+  font-weight: 500;
+  background-color: #FFFFFF;
+  color: #660000;
+}
+
+.localpoldata
+{ 
+  text-decoration: none; 
+  border-width: thin; 
+  border-style: solid; 
+  font-family: courier, times, sans-serif; 
+  font-weight: 500;
+  background-color: #FFFFFF;
+  color: #660000;
+}
+
+.vernierscandata
+{ 
+  text-decoration: none; 
+  border-width: thin; 
+  border-style: solid; 
+  font-family: courier, times, sans-serif; 
+  font-weight: 500;
+  background-color: #FFFFFF;
+  color: #660000;
+}
+
+.zerofielddata 
+{ 
+  text-decoration: none; 
+  border-width: thin; 
+  border-style: solid; 
+  font-family: courier, times, sans-serif; 
+  font-weight: 500;
+  background-color: #FFFFFF;
+  color: #660000;
+}
+
+.junkdata 
+{ 
+  text-decoration: none; 
+  border-width: thin; 
+  border-style: solid; 
+  font-family: courier, times, sans-serif; 
+  font-weight: 500;
+  background-color: #FFFFFF;
+  color: #666666;
+}
+
+.prejecteddata 
+{ 
+  text-decoration: none; 
+  border-width: thin; 
+  border-style: solid; 
+  font-family: courier, times, sans-serif; 
+  font-weight: 500;
+  background-color: #FFFFFF;
+  color: #666600;
+}
+
+.crejecteddata 
+{ 
+  text-decoration: none; 
+  border-width: thin; 
+  border-style: solid; 
+  font-family: courier, times, sans-serif; 
+  font-weight: 500;
+  background-color: #FFFFFF;
+  color: #666600;
+}
+
+.pedrejecteddata 
+{ 
+  text-decoration: none; 
+  border-width: thin; 
+  border-style: solid; 
+  font-family: courier, times, sans-serif; 
+  font-weight: 500;
+  background-color: #FFFFFF;
+  color: #666600;
+}
+
+.devcomponent
+{
+   font-weight: 700;
+}
+
+a.devmail
+{
+  color: red;
+}
+
+.devname
+{
+  text-decoration: underline;
+}

@@ -28,7 +28,7 @@ else
 endif
 
 if (! $?ONLMON_HTMLDIR) then
-  setenv ONLMON_HTMLDIR `pwd`
+  setenv ONLMON_HTMLDIR /sphenix/WWW/subsystem/OnlMonHtmlTest
 endif
 
 

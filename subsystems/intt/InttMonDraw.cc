@@ -250,14 +250,14 @@ int InttMonDraw::MakeHtml(const std::string &what)
   cl->CanvasToPng(TC[1], pngfile);
   // Now register also EXPERTS html pages, under the EXPERTS subfolder.
 
-  std::string logfile = cl->htmlRegisterPage(*this, "For EXPERTS/Log", "log", "html");
+  std::string logfile = cl->htmlRegisterPage(*this, "EXPERTS/Log", "log", "html");
   std::ofstream out(logfile.c_str());
   out << "<HTML><HEAD><TITLE>Log file for run " << cl->RunNumber()
       << "</TITLE></HEAD>" << std::endl;
   out << "<P>Some log file output would go here." << std::endl;
   out.close();
 
-  std::string status = cl->htmlRegisterPage(*this, "For EXPERTS/Status", "status", "html");
+  std::string status = cl->htmlRegisterPage(*this, "EXPERTS/Status", "status", "html");
   std::ofstream out2(status.c_str());
   out2 << "<HTML><HEAD><TITLE>Status file for run " << cl->RunNumber()
        << "</TITLE></HEAD>" << std::endl;

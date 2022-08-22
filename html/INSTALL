@@ -1,0 +1,28 @@
+To get html output browsing working, all you have to do is to copy all this directory content to a web server, and let this server handle CGI scripts. 
+For Apache, this is a matter of editing the configuration file (generally located in /etc/httpd/conf/httpd.conf) by adding the lines :
+
+# All .cgi files will be treated as CGI scripts
+AddHandle cgi-script .cgi
+
+# Allow CGI scripts in the directory you chose
+<Directory /dir/to/script/>
+  Options ExecCGI
+  Order Allow, Deny
+  Allow from All
+</Directory>
+
+Then the entry point is 
+
+http://youwebserver.com/you_script_dir/mon.cgi?runselect=1
+
+and off you go !
+
+Help on the mon.cgi script is inside the script.
+
+Note that look and feel can be changed using the Cascading Style Sheet file mon.css
+
+Enjoy !
+
+L. Aphecetche
+November 2003
+aphecetc@in2p3.fr
