@@ -164,7 +164,7 @@ int HcalMon::process_event(Event *e /* evt */)
           
         // fill time history histogram
         if (evtcnt <= x_range) {
-          h2_hcal_history->SetBinContent(h2_hcal_history->FindBin(ih,evtcnt),signal);
+          h2_hcal_history->SetBinContent(h2_hcal_history->FindBin(ih,evtcnt),running_mean);
           h2_hcal_history->SetTitle(TString::Format("%d",evtcnt));
         } else {
           for (int ix = 0; ix < 10; ix++) {
@@ -172,7 +172,7 @@ int HcalMon::process_event(Event *e /* evt */)
             h2_hcal_history->SetBinContent(h2_hcal_history->FindBin(ih,ix),h2_hcal_history->GetBinContent(h2_hcal_history->FindBin(ih,ix+1)));
             h2_hcal_history->SetTitle(TString::Format("%d",evtcnt));
           }
-          h2_hcal_history->SetBinContent(h2_hcal_history->FindBin(ih,10),signal);
+          h2_hcal_history->SetBinContent(h2_hcal_history->FindBin(ih,10),running_mean);
         }
 
       }// channel loop
