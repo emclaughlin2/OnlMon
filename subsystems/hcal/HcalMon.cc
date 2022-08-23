@@ -4,12 +4,14 @@
 // (more info - check the difference in include path search when using "" versus <>)
 
 #include "HcalMon.h"
+#include "pseudoRunningMean.h"
 
 #include <onlmon/OnlMon.h>  // for OnlMon
 #include <onlmon/OnlMonDB.h>
 #include <onlmon/OnlMonServer.h>
 
 #include <Event/Event.h>
+#include <Event/EventTypes.h>
 #include <Event/msg_profile.h>
 
 #include <TH1.h>
@@ -28,21 +30,6 @@ enum
   FILLMESSAGE = 2
 };
 
-HcalMon::HcalMon(const std::string &name)
-  : OnlMon(name)
-{
-  // leave ctor fairly empty, its hard to debug if code crashes already
-  // during a new HcalMon()
-  return;
-}
-
-HcalMon::~HcalMon()
-{
-  // you can delete NULL pointers it results in a NOOP (No Operation)
-  delete dbvars;
-  return;
-}
-
 const int hcal_etabin[] = 
   { 1,1,0,0,3,3,2,2,
     5,5,4,4,7,7,6,6,
@@ -59,8 +46,25 @@ const int hcal_phybin[] =
     1,0,1,0,1,0,1,0,
     1,0,1,0,1,0,1,0 };
 
-const int depth = 5;
-const int x_range = 10;
+const int depth = 50;
+const int hist_range = 10;
+const int n_packet = 32;
+const int n_channel = 48;
+
+HcalMon::HcalMon(const std::string &name)
+  : OnlMon(name)
+{
+  // leave ctor fairly empty, its hard to debug if code crashes already
+  // during a new HcalMon()
+  return;
+}
+
+HcalMon::~HcalMon()
+{
+  // you can delete NULL pointers it results in a NOOP (No Operation)
+  delete dbvars;
+  return;
+}
 
 int HcalMon::Init()
 {
@@ -85,6 +89,25 @@ int HcalMon::Init()
   dbvars = new OnlMonDB(ThisName);  // use monitor name for db table name
   DBVarInit();
   Reset();
+
+  // make the per-packet running mean objects
+  // 32 packets and 48 channels for hcal detectors
+  for ( int i = 0; i < n_packet; i++) {
+    rm_vector.push_back( new pseudoRunningMean(n_channel,depth));
+  }
+
+  return 0;
+}
+
+int HcalMon::BeginRun(const int /* runno */)
+{
+  // if you need to read calibrations on a run by run basis
+  // this is the place to do it
+  std::vector<runningMean*>::iterator rm_it;
+  for ( rm_it = rm_vector.begin(); rm_it != rm_vector.end(); ++rm_it) {
+    (*rm_it)->Reset();
+  }
+
   return 0;
 }
 
@@ -97,27 +120,19 @@ double HcalMon::getSignal(Packet *p, const int channel)
   baseline /= 3.;
 
   double signal = 0;
-  float x = 0;
+  float norm = 0;
   for (int s = 3;  s < p->iValue(0,"SAMPLES"); s++) {
-      x++;
+      norm++;
       signal += p->iValue(s,channel) - baseline;
   }
-  signal /= x;
+  signal /= norm;
 
   return signal;
 }
 
-
-int HcalMon::BeginRun(const int /* runno */)
-{
-  // if you need to read calibrations on a run by run basis
-  // this is the place to do it
-  return 0;
-}
-
 int HcalMon::process_event(Event *e /* evt */)
 {
-  evtcnt++;
+  //evtcnt++;
   OnlMonServer *se = OnlMonServer::instance();
   // using ONLMONBBCLL1 makes this trigger selection configurable from the outside
   // e.g. if the BBCLL1 has problems or if it changes its name
@@ -134,45 +149,74 @@ int HcalMon::process_event(Event *e /* evt */)
     // message types
     se->send_message(this, MSG_SOURCE_UNSPECIFIED, MSG_SEV_INFORMATIONAL, msg.str(), TRGMESSAGE);
   }
+  
+  if ( e->getEvtType() == BEGRUNEVENT) { // see what kind of run this is, LED or Physics
+    Packet *p961 = e->getPacket(961);
+    if ( p961) { // this is only printing a message
+      p961->dump();
+      delete p961;
+    }
+    Packet *p962 = e->getPacket(962);
+    if ( p962) {   // we extract the flag 0 = Physics, 1= LED, more can be defined
+      switch (p962->iValue(0) ) {
+        case 0:
+          runtypestr = "Physics";
+          break;
+        case 1:
+          runtypestr = "LED";
+          break;
+        default:
+          runtypestr = "Unknown";
+          break;
+        }
+      delete p962;
+    }
+    return 0; // ends the process_event here if it is a begin run event
+  }
+
+  // set event count not by number of loops through process_event but by the event sequence number 
+  // this accounts for processing begin run events 
+  if ( e->getEvtType() == 1) {
+    h2_hcal_hits->Reset();
+    h2_hcal_mean->Reset();
+  }
+  evtcnt = e->getEvtSequence();
+  h2_hcal_hits->SetTitle(TString::Format("Hcal Hits Run %d Event %d RunType %s",e->getRunNumber(), e->getEvtSequence(), runtypestr.c_str()));
+  h2_hcal_mean->SetTitle(TString::Format("Hcal Running Mean Run %d Event %d RunType %s",e->getRunNumber(), e->getEvtSequence(), runtypestr.c_str()));
 
   for (int packet = 8001; packet < 8033; packet++) {
     Packet *p = e->getPacket(packet);
     if (p) {
-      int ip = p->getIdentifier() - 8001;
+      int ip = p->getIdentifier() - 8001; // packet number indexed [0,32)
+      double signalvector[n_channel] = {0.};
+      for (int c = 0; c < n_channel; c++) {
+        signalvector[c] = getSignal(p,c);
+      }
+      rm_vector[ip]->Add(signalvector);
 
-      for (int c = 0; c < 48; c++) {
-        float signal =  getSignal(p,c);
+      for (int c = 0; c < n_channel; c++) {
+        double signal =  getSignal(p,c);
         double phi_bin =  (2 * ip + hcal_phybin[c] + 0.5) ;
         double eta_bin = hcal_etabin[c] + 0.5;
         int ih = int(64 * (eta_bin - 0.5) + (phi_bin - 0.5)); // 1D ieta+iphi indexing
 
         // fill hits histogram
-        if (signal > 100) {
-          h2_hcal_hits->Fill(eta_bin,phi_bin);
-        }
+        if (signal > 100) h2_hcal_hits->Fill(eta_bin,phi_bin);
 
         // fill running mean histogram
-        if (evtcnt == 1) h2_hcal_mean->SetBinContent(h2_hcal_mean->FindBin(eta_bin,phi_bin),0.0);
-        float running_mean = 0.0;
-        float old_mean = h2_hcal_mean->GetBinContent(h2_hcal_mean->FindBin(eta_bin,phi_bin));
-        if (evtcnt <= depth) {
-          running_mean = old_mean * (evtcnt - 1) + signal;
-        } else {
-          running_mean = old_mean * (depth - 1) + signal;
-        }
-        h2_hcal_mean->SetBinContent(h2_hcal_mean->FindBin(eta_bin,phi_bin),running_mean);
-          
+        h2_hcal_mean->SetBinContent(h2_hcal_mean->FindBin(eta_bin,phi_bin),rm_vector[ip]->getMean(c));
+
         // fill time history histogram
-        if (evtcnt <= x_range) {
-          h2_hcal_history->SetBinContent(h2_hcal_history->FindBin(ih,evtcnt),running_mean);
+        if (evtcnt <= hist_range) {
+          h2_hcal_history->SetBinContent(h2_hcal_history->FindBin(ih,evtcnt),rm_vector[ip]->getMean(c));
           h2_hcal_history->SetTitle(TString::Format("%d",evtcnt));
         } else {
-          for (int ix = 0; ix < 10; ix++) {
-            // move bin content over from index i to index i-1
-            h2_hcal_history->SetBinContent(h2_hcal_history->FindBin(ih,ix),h2_hcal_history->GetBinContent(h2_hcal_history->FindBin(ih,ix+1)));
-            h2_hcal_history->SetTitle(TString::Format("%d",evtcnt));
+          for (int ihr = 1; ihr < hist_range; ihr++) {
+            // move bin content over from index i to index i-1 for events > time history range
+            h2_hcal_history->SetBinContent(h2_hcal_history->FindBin(ih,ihr),h2_hcal_history->GetBinContent(h2_hcal_history->FindBin(ih,ihr+1)));
           }
-          h2_hcal_history->SetBinContent(h2_hcal_history->FindBin(ih,10),running_mean);
+          h2_hcal_history->SetTitle(TString::Format("%d",evtcnt));
+          h2_hcal_history->SetBinContent(h2_hcal_history->FindBin(ih,hist_range),rm_vector[ip]->getMean(c));
         }
 
       }// channel loop
