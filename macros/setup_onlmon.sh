@@ -6,6 +6,24 @@ then
   exit
 fi
 
+opt_n=0
+
+for arg in "$@"
+do
+    case "$arg" in
+    -n)
+        opt_n=1
+        ;;
+    esac
+done
+
+if [[ $opt_n != 0 ]]
+then
+  tmponlmonmain=$ONLMON_MAIN
+  unset ${!ONLMON_*}
+  export ONLMON_MAIN=$tmponlmonmain
+fi
+
 if [[ -z "$ONLMON_MAIN" ]]
 then
   echo "ONLMON_MAIN environment variable not set, doing nothing"
@@ -20,22 +38,21 @@ then
 fi
 
 # create save directory if not exist
-if [[ $ONLMON_SAVEDIR ]]
+if [ ! -n "$ONLMON_SAVEDIR" ]
 then
-  if  ! -d $ONLMON_SAVEDIR ]
-  then
-    mkdir -p $ONLMON_SAVEDIR
-  fi
+#  [ -d $ONLMON_SAVEDIR ] || mkdir -p $ONLMON_SAVEDIR
+#else
+  export ONLMON_SAVEDIR=`pwd`
 fi
 
 # create save directory if not exist
-if [[ ! -z "$ONLMON_LOGDIR" ]]
+if [ ! -n "$ONLMON_LOGDIR" ]
 then
-  if [ ! -d $ONLMON_LOGDIR ]
-  then
-    mkdir -p $ONLMON_LOGDIR
-  fi
-else
+#  if [ ! -d $ONLMON_LOGDIR ]
+#  then
+#    mkdir -p $ONLMON_LOGDIR
+#  fi
+#else
   export ONLMON_LOGDIR=`pwd`
 fi
 
@@ -46,13 +63,13 @@ fi
 
 
 # create history directory if not exist
-if [[ ! -z "$ONLMON_HISTORYDIR" ]]
-then
-  if [ ! -d $ONLMON_HISTORYDIR ]
-  then
-    mkdir -p $ONLMON_HISTORYDIR
-  fi
-fi
+#if [ -n "$ONLMON_HISTORYDIR" ]
+#then
+#  if [ ! -d $ONLMON_HISTORYDIR ]
+#  then
+#    mkdir -p $ONLMON_HISTORYDIR
+#  fi
+#fi
 
 #if [[ -z "$ONLINE_LOG" ]] then
 #  export ONLINE_LOG=/export/data1/log
@@ -77,7 +94,22 @@ then
   export ONLMON_RUNDIR=$ONLMON_MAIN/share
 fi
 
-source /opt/sphenix/core/bin/setup_local.sh $ONLMON_MAIN
+if [ -f ${OPT_SPHENIX}/bin/setup_local.sh ]
+then
+  source ${OPT_SPHENIX}/bin/setup_local.sh ${ONLMON_MAIN}
+else
+  ROOT_INCLUDE_PATH=./:$ONLINE_MAIN/include
+  for local_incdir in $ONLINE_MAIN/include/*
+    do
+    if [ -d $local_incdir ]
+    then
+	ROOT_INCLUDE_PATH=$ROOT_INCLUDE_PATH:$local_incdir
+    fi
+  done
+  export ROOT_INCLUDE_PATH=${ONLMON_MAIN}/include:${ROOT_INCLUDE_PATH}
+  export LD_LIBRARY_PATH=${ONLMON_MAIN}/lib:$LD_LIBRARY_PATH
+  export PATH=${ONLMON_MAIN}/bin:${PATH}
+fi
 # all subsystems scripts end in Setup.csh
 for script in $ONLMON_BIN/*Setup.sh
 do

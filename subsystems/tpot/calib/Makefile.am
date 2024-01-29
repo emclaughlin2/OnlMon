@@ -4,4 +4,4 @@ include_HEADERS =
 tpotdatadir = $(pkgdatadir)/tpot
 
 tpotdata_DATA = \
-  TpotMonData.dat
+  TPOT_Pedestal-000.root

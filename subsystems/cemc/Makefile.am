@@ -7,8 +7,7 @@ SUBDIRS = calib
 
 AM_CPPFLAGS = \
   -I$(includedir) \
-  -I$(ONLMON_MAIN)/include \
-  -I$(OFFLINE_MAIN)/include \
+  -I$(ONLINE_MAIN)/include \
   -isystem$(ROOTSYS)/include
 
 lib_LTLIBRARIES = \
@@ -17,29 +16,25 @@ lib_LTLIBRARIES = \
 
 libonlcemcmon_server_la_LIBADD = \
   -L$(libdir) \
-  -L$(OFFLINE_MAIN)/lib \
+  -L$(ONLINE_MAIN)/lib \
   -lonlmonserver \
-  -lonlmondb
+  -lonlmonutils \
+  -lcalo_io \
+  -lcalo_reco
 
 libonlcemcmon_client_la_LIBADD = \
   -L$(libdir) \
-  -L$(OFFLINE_MAIN)/lib \
-  -lonlmonclient \
-  -lonlmondb
-
+  -L$(ONLINE_MAIN)/lib \
+  -lonlmonclient
 
 cemcincludedir=$(pkgincludedir)/cemc
 
 cemcinclude_HEADERS = \
   CemcMon.h \
-  CemcMonDraw.h \
-  runningMean.h
+  CemcMonDraw.h
 
 libonlcemcmon_server_la_SOURCES = \
-  CemcMon.cc \
-  runningMean.cc \
-  pseudoRunningMean.cc \
-  fullRunningMean.cc
+  CemcMon.cc
 
 libonlcemcmon_client_la_SOURCES = \
   CemcMonDraw.cc

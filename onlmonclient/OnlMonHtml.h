@@ -1,5 +1,5 @@
-#ifndef __OnlMonHtml_h__
-#define __OnlMonHtml_h__
+#ifndef ONLMONHTML_H
+#define ONLMONHTML_H
 
 #include <set>
 #include <string>

@@ -13,6 +13,7 @@ class OnlMonDraw
 
   virtual int Init() { return 0; }
   virtual int Draw(const std::string &what = "ALL");
+  virtual int SavePlot(const std::string &what = "ALL", const std::string &type = "png");
   virtual int MakePS(const std::string &what = "ALL");
   virtual int MakeHtml(const std::string &what = "ALL");
   const std::string Name() const { return ThisName; }

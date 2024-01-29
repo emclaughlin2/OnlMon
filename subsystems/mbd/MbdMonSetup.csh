@@ -1,1 +1,0 @@
-setenv MBDCALIB $ONLMON_CALIB/mbd

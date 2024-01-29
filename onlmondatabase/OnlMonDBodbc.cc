@@ -4,8 +4,6 @@
 
 #include <onlmon/OnlMonBase.h>  // for OnlMonBase
 
-#include <phool/phool.h>
-
 #include <odbc++/connection.h>
 #include <odbc++/databasemetadata.h>
 #include <odbc++/drivermanager.h>
@@ -133,9 +131,9 @@ int OnlMonDBodbc::CheckAndCreateTable(const std::map<const std::string, OnlMonDB
     // column names are lower case only, so convert string to lowercase
     // The bizarre cast here is needed for newer gccs
     transform(varname.begin(), varname.end(), varname.begin(), (int (*)(int)) tolower);
-    for (short int j = 0; j < 3; j++)
+    for (const auto & j : addvarname)
     {
-      std::string thisvar = varname + addvarname[j];
+      std::string thisvar = varname + j;
       for (unsigned int i = DEFAULTCOLUMNS + 1; i <= nocolumn; i++)
       {
         if (meta->getColumnName(i) == thisvar)
@@ -329,7 +327,7 @@ int OnlMonDBodbc::AddRow(const time_t ticks, const int runnumber, const std::map
   std::map<const std::string, OnlMonDBVar*>::const_iterator iter;
   int iret = 0;
   int minutesinterval = MINUTESINTERVAL;
-  std::ostringstream cmd, cmd1, datestream, datestreamhalf;
+  std::ostringstream cmd, cmd1, datestream;
   odbc::Timestamp thistime(ticks);
   odbc::Timestamp mintime;
   odbc::Timestamp maxtime;
@@ -360,7 +358,7 @@ searchagain:
   std::cout << "cmd: " << cmd.str() << std::endl;
 #endif
 
-  odbc::ResultSet* rs = 0;
+  odbc::ResultSet* rs = nullptr;
 
   try
   {
@@ -431,7 +429,7 @@ searchagain:
               int iret2 = upd->executeUpdate(cmd.str());
               if (!iret2)
               {
-                std::cout << PHWHERE << "Update failed please send mail to pinkenburg@bnl.gov"
+                std::cout << __PRETTY_FUNCTION__ << "Update failed please send mail to pinkenburg@bnl.gov"
                           << std::endl;
                 std::cout << "And include the macro and the following info" << std::endl;
                 std::cout << "TableName: " << table << std::endl;
@@ -484,7 +482,7 @@ searchagain:
     }
     catch (odbc::SQLException& e)
     {
-      std::string errmsg = e.getMessage();
+      const std::string& errmsg = e.getMessage();
       if (errmsg.find("Cannot insert a duplicate key into unique index") != std::string::npos)
       {
 #ifdef VERBOSE
@@ -494,7 +492,7 @@ searchagain:
       }
       else
       {
-        std::cout << PHWHERE << " DB Error in execute stmt: " << e.getMessage() << std::endl;
+        std::cout << __PRETTY_FUNCTION__ << " DB Error in execute stmt: " << e.getMessage() << std::endl;
         std::ofstream savesql("lostupdates.sql", std::ios_base::app);
         savesql << cmd.str() << std::endl;
         savesql.close();
@@ -621,13 +619,13 @@ int OnlMonDBodbc::GetConnection()
   }
   catch (odbc::SQLException& e)
   {
-    std::cout << PHWHERE
+    std::cout << __PRETTY_FUNCTION__
               << " Exception caught during DriverManager::getConnection" << std::endl;
     std::cout << "Message: " << e.getMessage() << std::endl;
     if (con)
     {
       delete con;
-      con = 0;
+      con = nullptr;
     }
     return -1;
   }

@@ -2,8 +2,6 @@
 
 #include <onlmon/RunDBodbc.h>
 
-#include <phool/phool.h>
-
 #include <dirent.h>
 #include <sys/stat.h>
 #include <algorithm>
@@ -105,7 +103,7 @@ void OnlMonHtml::addMenu(const std::string& header, const std::string& path,
   {
     if (verbosity())
     {
-      std::cout << PHWHERE << "File " << menufile.str() << " does not exist."
+      std::cout << __PRETTY_FUNCTION__ << "File " << menufile.str() << " does not exist."
                 << "I'm creating it now" << std::endl;
     }
     std::ofstream out(menufile.str().c_str());
@@ -115,7 +113,7 @@ void OnlMonHtml::addMenu(const std::string& header, const std::string& path,
   {
     if (verbosity())
     {
-      std::cout << PHWHERE << "Reading file " << menufile.str() << std::endl;
+      std::cout << __PRETTY_FUNCTION__ << "Reading file " << menufile.str() << std::endl;
     }
   }
 
@@ -124,7 +122,7 @@ void OnlMonHtml::addMenu(const std::string& header, const std::string& path,
   char str[1024];
   while (in.getline(str, 1024, '\n'))
   {
-    lines.push_back(str);
+    lines.emplace_back(str);
   }
   in.close();
 
@@ -189,7 +187,7 @@ void OnlMonHtml::plainHtmlMenu(const std::set<std::string>& olines)
   std::ofstream out(htmlmenufile.str().c_str());
   if (!out.good())
   {
-    std::cout << PHWHERE << " cannot open output file "
+    std::cout << __PRETTY_FUNCTION__ << " cannot open output file "
               << htmlmenufile.str() << std::endl;
     return;
   }
@@ -264,7 +262,7 @@ void OnlMonHtml::namer(const std::string& header,
 
   if (verbosity())
   {
-    std::cout << PHWHERE << "namer: header=" << header
+    std::cout << __PRETTY_FUNCTION__ << "namer: header=" << header
               << " basefilename=" << basefilename << " ext=" << ext
               << std::endl
               << "fullfilename=" << fullfilename
@@ -343,7 +341,7 @@ void OnlMonHtml::runInit()
     mkdirlist.push_back(fulldir.str());
     std::string updir = fulldir.str();
     std::string::size_type pos1;
-    while ((pos1 = updir.rfind("/")) != std::string::npos)
+    while ((pos1 = updir.rfind('/')) != std::string::npos)
     {
       updir.erase(pos1, updir.size());
       htdir = opendir(updir.c_str());
@@ -362,11 +360,11 @@ void OnlMonHtml::runInit()
       std::string md = *(mkdirlist.rbegin());
       if (verbosity())
       {
-        std::cout << PHWHERE << "Trying to create dir " << md << std::endl;
+        std::cout << __PRETTY_FUNCTION__ << "Trying to create dir " << md << std::endl;
       }
       if (mkdir(md.c_str(), S_IRWXU | S_IRWXG | S_IRWXO))
       {
-        std::cout << PHWHERE << "Error creating directory " << md << std::endl;
+        std::cout << __PRETTY_FUNCTION__ << "Error creating directory " << md << std::endl;
         fHtmlRunDir = fHtmlDir;
         break;
       }
@@ -395,7 +393,7 @@ void OnlMonHtml::runInit()
 
   if (verbosity())
   {
-    std::cout << PHWHERE << "OK. fHtmlRunDir=" << fHtmlRunDir << std::endl;
+    std::cout << __PRETTY_FUNCTION__ << "OK. fHtmlRunDir=" << fHtmlRunDir << std::endl;
   }
 }
 

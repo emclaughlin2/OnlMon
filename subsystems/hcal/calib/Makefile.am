@@ -4,4 +4,5 @@ include_HEADERS =
 hcaldatadir = $(pkgdatadir)/hcal
 
 hcaldata_DATA = \
-  HcalMonData.dat
+  testbeam_ihcal_template.root \
+  testbeam_ohcal_template.root

@@ -1,7 +1,5 @@
 #include "OnCalDBodbc.h"
 
-#include <phool/phool.h>
-
 #include <odbc++/connection.h>
 #include <odbc++/drivermanager.h>
 #include <odbc++/statement.h>  // for Statement
@@ -37,7 +35,7 @@ int OnCalDBodbc::GetLastCalibratedRun(const int runno) const
   }
   catch (odbc::SQLException& e)
   {
-    std::cout << PHWHERE
+    std::cout << __PRETTY_FUNCTION__
               << " Exception caught during DriverManager::getConnection" << std::endl;
     std::cout << "Message: " << e.getMessage() << std::endl;
     return closestgoodrun;

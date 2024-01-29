@@ -5,8 +5,6 @@
 #include <onlmon/OnlMonBase.h>  // for OnlMonBase
 #include <onlmon/OnlMonServer.h>
 
-#include <phool/phool.h>
-
 #include <ctype.h>  // for tolower
 #include <algorithm>
 #include <cstdio>
@@ -74,7 +72,7 @@ int OnlMonDB::SetVar(const std::string &varname, const float var[3])
     iter->second->SetVar(var);
     return 0;
   }
-  std::cout << PHWHERE << " Could not find Variable " << varname << " in DB list" << std::endl;
+  std::cout << __PRETTY_FUNCTION__ << " Could not find Variable " << varname << " in DB list" << std::endl;
   return -1;
 }
 

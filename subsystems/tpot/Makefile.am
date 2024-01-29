@@ -7,23 +7,26 @@ SUBDIRS = calib
 
 AM_CPPFLAGS = \
   -I$(includedir) \
-  -I$(ONLMON_MAIN)/include \
+  -I$(ONLINE_MAIN)/include \
   -I$(OFFLINE_MAIN)/include \
   -isystem$(ROOTSYS)/include
+
+AM_LDFLAGS = \
+  -L$(libdir) \
+  -L$(ONLINE_MAIN)/lib \
+  -L$(OFFLINE_MAIN)/lib
 
 lib_LTLIBRARIES = \
   libonltpotmon_client.la \
   libonltpotmon_server.la
 
 libonltpotmon_server_la_LIBADD = \
-  -L$(libdir) \
-  -L$(OFFLINE_MAIN)/lib \
+  -lmicromegas_io \
   -lonlmonserver \
   -lonlmondb
 
 libonltpotmon_client_la_LIBADD = \
-  -L$(libdir) \
-  -L$(OFFLINE_MAIN)/lib \
+  -lmicromegas_io \
   -lonlmonclient \
   -lonlmondb
 
@@ -32,13 +35,16 @@ tpotincludedir=$(pkgincludedir)/tpot
 
 tpotinclude_HEADERS = \
   TpotMon.h \
-  TpotMonDraw.h
+  TpotMonDraw.h \
+  MicromegasGeometry.h
 
 libonltpotmon_server_la_SOURCES = \
-  TpotMon.cc
+  TpotMon.cc \
+  MicromegasGeometry.cc
 
 libonltpotmon_client_la_SOURCES = \
-  TpotMonDraw.cc
+  TpotMonDraw.cc \
+  MicromegasGeometry.cc
 
 bin_SCRIPTS = \
   TpotMonSetup.csh \
@@ -47,7 +53,6 @@ bin_SCRIPTS = \
 noinst_PROGRAMS = \
   testexternals_server \
   testexternals_client
-
 
 testexternals_server_SOURCES = \
   testexternals.cc

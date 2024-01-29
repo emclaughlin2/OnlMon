@@ -4,4 +4,4 @@ include_HEADERS =
 cemcdatadir = $(pkgdatadir)/cemc
 
 cemcdata_DATA = \
-  CemcMonData.dat
+  testbeam_cemc_template.root

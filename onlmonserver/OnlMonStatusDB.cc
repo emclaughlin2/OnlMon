@@ -1,7 +1,5 @@
 #include "OnlMonStatusDB.h"
 
-#include <phool/phool.h>
-
 #include <odbc++/connection.h>
 #include <odbc++/drivermanager.h>
 #include <odbc++/resultset.h>
@@ -49,7 +47,7 @@ int OnlMonStatusDB::CheckAndCreateTable()
   }
   catch (odbc::SQLException& e)
   {
-    std::string message = e.getMessage();
+    const std::string& message = e.getMessage();
     if (message.find("does not exist") == std::string::npos)
     {
       std::cout << "Exception caught" << std::endl;
@@ -90,7 +88,7 @@ int OnlMonStatusDB::CheckAndCreateMonitor(const std::string& name)
   }
   catch (odbc::SQLException& e)
   {
-    std::cout << PHWHERE << "Exception caught" << std::endl;
+    std::cout << __PRETTY_FUNCTION__ << "Exception caught" << std::endl;
     std::cout << "Message: " << e.getMessage() << std::endl;
     return -1;
   }
@@ -100,7 +98,7 @@ int OnlMonStatusDB::CheckAndCreateMonitor(const std::string& name)
   }
   catch (odbc::SQLException& e)
   {
-    std::string exceptionmessage = e.getMessage();
+    const std::string& exceptionmessage = e.getMessage();
     if (exceptionmessage.find("not found in result set") != std::string::npos)
     {
       cmd.str("");
@@ -198,12 +196,12 @@ int OnlMonStatusDB::UpdateStatus(const std::string& name, const int runnumber, c
 {
   if (CheckAndCreateMonitor(name))
   {
-    std::cout << PHWHERE << "Problem encountered, cannot do update" << std::endl;
+    std::cout << __PRETTY_FUNCTION__ << "Problem encountered, cannot do update" << std::endl;
     return -1;
   }
   if (FindAndInsertRunNum(runnumber) != 0)
   {
-    std::cout << PHWHERE << "Problem updating runnumber encountered, cannot do update" << std::endl;
+    std::cout << __PRETTY_FUNCTION__ << "Problem updating runnumber encountered, cannot do update" << std::endl;
     return -1;
   }
 
@@ -214,7 +212,7 @@ int OnlMonStatusDB::UpdateStatus(const std::string& name, const int runnumber, c
       << " = " << status
       << " where runnumber = "
       << runnumber;
-  odbc::Statement* stmtupd = 0;
+  odbc::Statement* stmtupd = nullptr;
   try
   {
     stmtupd = con->createStatement();
@@ -232,7 +230,7 @@ int OnlMonStatusDB::UpdateStatus(const std::string& name, const int runnumber, c
   }
   catch (odbc::SQLException& e)
   {
-    std::cout << PHWHERE << "Exception caught" << std::endl;
+    std::cout << __PRETTY_FUNCTION__ << "Exception caught" << std::endl;
     std::cout << "Message: " << e.getMessage() << std::endl;
     return -1;
   }
@@ -251,7 +249,7 @@ int OnlMonStatusDB::GetConnection()
   }
   catch (odbc::SQLException& e)
   {
-    std::cout << PHWHERE
+    std::cout << __PRETTY_FUNCTION__
               << " Exception caught during DriverManager::getConnection" << std::endl;
     std::cout << "Message: " << e.getMessage() << std::endl;
     if (con)

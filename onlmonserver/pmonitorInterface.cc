@@ -3,12 +3,10 @@
 */
 
 #include "pmonitorInterface.h"
-#include "OnlMonServer.h"
-
 #include "HistoBinDefs.h"
-#include "PortNumber.h"
-
-#include <phool/phool.h>
+#include "OnlMon.h"
+#include "OnlMonDefs.h"
+#include "OnlMonServer.h"
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -58,26 +56,34 @@ static void *server(void *);
 static TThread *ServerThread = nullptr;
 #endif
 
+#ifdef USE_MUTEX
 pthread_mutex_t mutex;
-TH1 *FrameWorkVars = 0;
+#endif
+
+TH1 *FrameWorkVars = nullptr;
 
 //*********************************************************************
 
 int pinit()
 {
   OnlMonServer *Onlmonserver = OnlMonServer::instance();
+#ifdef USE_MUTEX
   Onlmonserver->GetMutex(mutex);
+#endif
   for (int i = 0; i < kMAXSIGNALS; i++)
   {
     gSystem->IgnoreSignal((ESignals) i);
   }
+#ifdef USE_MUTEX
   pthread_mutex_lock(&mutex);
+#endif
+
 #if defined(SERVER) || defined(ROOTTHREAD)
 
   pthread_t ThreadId = 0;
   if (!ServerThread)
   {
-    //std::cout << "creating server thread" << std::endl;
+    // std::cout << "creating server thread" << std::endl;
 #ifdef SERVER
 
     ServerThread = pthread_create(&ThreadId, nullptr, server, (void *) nullptr);
@@ -93,7 +99,9 @@ int pinit()
   // for the timestamp we need doubles
   FrameWorkVars = new TH1D("FrameWorkVars", "FrameWorkVars", NFRAMEWORKBINS, 0., NFRAMEWORKBINS);
   Onlmonserver->registerCommonHisto(FrameWorkVars);
+#ifdef USE_MUTEX
   pthread_mutex_unlock(&mutex);
+#endif
 
   return 0;
 }
@@ -101,26 +109,23 @@ int pinit()
 //*********************************************************************
 int process_event(Event *evt)
 {
-  static time_t savetmpticks = 0x7FFFFFFF;
-  static time_t borticks = 0;
-  static time_t eorticks = 0;
+  static uint64_t savetmpticks = 0x7FFFFFFF;
+  static uint64_t borticks = 0;
+  static uint64_t eorticks = 0;
   static int eventcnt = 0;
-  static int lowrunwarning = 1;
-  static int lowrunevents = 0;
-  static unsigned int oldetmask = 0xFFFFFFFF;
 
   OnlMonServer *se = OnlMonServer::instance();
-  time_t tmpticks = evt->getTime();
+  uint64_t tmpticks = evt->getTime();
+
   // first test if a new run has started and call BOR/EOR methods of monitors
   if (se->RunNumber() == -1)
   {
-    lowrunevents = 0;
     savetmpticks = 0x7FFFFFFF;
-    FrameWorkVars->SetBinContent(LOWRUNEVENTBIN, (Stat_t) lowrunevents);
-
     eventcnt = 0;
     int newrun = evt->getRunNumber();
+#ifdef USE_MUTEX
     pthread_mutex_lock(&mutex);
+#endif
     FrameWorkVars->SetBinContent(RUNNUMBERBIN, (Stat_t) newrun);
     se->BadEvents(0);
     se->EventNumber(evt->getEvtSequence());
@@ -131,54 +136,17 @@ int process_event(Event *evt)
     se->CurrentTicks(tmpticks);
     se->BeginRun(newrun);
     // set trigger mask in et pool frontend
-    unsigned int scaledtrigmask = se->ScaledTrigMask();
-    if (scaledtrigmask != oldetmask)  // only bother the et pool if the mask has changed
-    {
-      if (scaledtrigmask != 0xFFFFFFFF)
-      {
-        //	      petsetmask(scaledtrigmask);
-      }
-      else
-      {
-        // important is only the third parameter to disable et pool selection
-        //	      petsetmask(0, 0, 1);
-      }
-      oldetmask = scaledtrigmask;
-    }
     borticks = se->BorTicks();
     FrameWorkVars->SetBinContent(BORTIMEBIN, (Stat_t) borticks);
+#ifdef USE_MUTEX
     pthread_mutex_unlock(&mutex);
+#endif
     eorticks = borticks;
   }
-  if (se->RunNumber() > evt->getRunNumber())
-  {
-    lowrunevents++;
-    FrameWorkVars->SetBinContent(LOWRUNEVENTBIN, (Stat_t) lowrunevents);
-    if (lowrunwarning)
-    {
-      printf("event run number %d smaller than current run number %d discarding event\n", evt->getRunNumber(), se->RunNumber());
-      printf("If you are testing open a file with a higher run number\n");
-      printf("You will get this warning only once per run\n");
-      lowrunwarning = 0;
-    }
-    return 0;
-  }
-  /*
-  if ((evt->getRunNumber() > 500000 || evt->getRunNumber() < 60000)  && evt->getRunNumber() != 1 && evt->getRunNumber() != 0xFEE2DCB)
-    {
-      std::ostringstream msg;
-      msg << PHWHERE << " huge or tiny event run number "
-	  << evt->getRunNumber()
-	  << " discarding event" ;
-      send_message(MSG_SEV_WARNING, msg.str());
-      se->AddBadEvent();
-      return 0;
-    }
-*/
   if (evt->getEvtLength() <= 0 || evt->getEvtLength() > 2500000)
   {
     std::ostringstream msg;
-    msg << PHWHERE << "Discarding event with length "
+    msg << __PRETTY_FUNCTION__ << "Discarding event with length "
         << evt->getEvtLength();
     send_message(MSG_SEV_WARNING, msg.str());
     se->AddBadEvent();
@@ -190,7 +158,9 @@ int process_event(Event *evt)
   {
     // ROOT crashes when one thread updates histos while they are
     // being saved, need mutex protection here
+#ifdef USE_MUTEX
     pthread_mutex_lock(&mutex);
+#endif
     FrameWorkVars->SetBinContent(EORTIMEBIN, (Stat_t) eorticks);  // set EOR time
     se->EndRun(oldrun);
     se->WriteHistoFile();
@@ -208,25 +178,10 @@ int process_event(Event *evt)
     se->BeginRun(newrun);
     borticks = se->BorTicks();
     FrameWorkVars->SetBinContent(BORTIMEBIN, (Stat_t) borticks);
-    unsigned int scaledtrigmask = se->ScaledTrigMask();
-    if (scaledtrigmask != oldetmask)  // only bother the et pool if the mask has changed
-    {
-      if (scaledtrigmask != 0xFFFFFFFF)
-      {
-        //	      petsetmask(scaledtrigmask);
-      }
-      else
-      {
-        // important is only the third parameter to disable et pool selection
-        //	      petsetmask(0, 0, 1);
-      }
-      oldetmask = scaledtrigmask;
-    }
     eventcnt = 0;
-    lowrunwarning = 1;  // so we only get one low runnumber warning in logfile
-    lowrunevents = 0;   // clear the low run event counter
-    FrameWorkVars->SetBinContent(LOWRUNEVENTBIN, (Stat_t) lowrunevents);
+#ifdef USE_MUTEX
     pthread_mutex_unlock(&mutex);
+#endif
     savetmpticks = 0x7FFFFFFF;
   }
 
@@ -235,35 +190,27 @@ int process_event(Event *evt)
   // save earliest time stamp and number of events with earlier timestamps
   if (tmpticks < borticks)
   {
+#ifdef USE_MUTEX
     pthread_mutex_lock(&mutex);
+#endif
     FrameWorkVars->AddBinContent(EARLYEVENTNUMBIN);
     if (tmpticks < savetmpticks)
     {
       savetmpticks = tmpticks;
       FrameWorkVars->SetBinContent(EARLYEVENTTIMEBIN, (Stat_t) tmpticks);
     }
+#ifdef USE_MUTEX
     pthread_mutex_unlock(&mutex);
+#endif
   }
   if (eorticks < se->CurrentTicks())
   {
     eorticks = se->CurrentTicks();
   }
-  if (se->ScaledTrigMask() != 0xFFFFFFFF && evt->getEvtType() == DATAEVENT && !se->isStandaloneRun())
-  {
-    if (!(evt->getTagWord(0) & se->ScaledTrigMask()))
-    {
-      //	  	  std::cout << "discarding 0x" << hex << evt->getTagWord(0) << dec << std::endl;
-      return 0;
-    }
-    //       else
-    // 	{
-    // 	  std::cout << "accepting 0x" << hex << evt->getTagWord(0) << dec << std::endl;
-    // 	}
-  }
   if (evt->getErrorCode())
   {
     std::ostringstream msg;
-    msg << PHWHERE << " Event with error code: "
+    msg << __PRETTY_FUNCTION__ << " Event with error code: "
         << evt->getErrorCode()
         << " discarding event " << evt->getEvtSequence();
     send_message(MSG_SEV_WARNING, msg.str());
@@ -271,39 +218,16 @@ int process_event(Event *evt)
     return 0;
   }
 
-  Packet *p = evt->getPacket(14001);
-  if (p)
-  {
-    se->Trigger(p->iValue(0, 1), 0);
-    se->Trigger(p->iValue(0, 2), 1);
-    se->Trigger(p->iValue(0, 3), 2);
-    //      std::cout << "Accepting 0x" << hex <<  p->iValue(0, SCALEDTRIG) << std::endl;
-    //       unsigned int livetrigword = p->iValue(0, LIVETRIG) & 0x00FFFFFF;
-    //       for (int i = 24; i < 32; i++)
-    // 	{
-    // 	  if (!(se->OnlTrig()->get_lvl1_trig_bitmask_bybit(i)))
-    // 	    {
-    // 	      livetrigword |= ((0x1 << i) & se->Trigger((unsigned short) 0));
-    // 	    }
-    // 	}
-    //       se->Trigger(livetrigword,1);
-    delete p;
-  }
-  else
-  {
-    unsigned int inittrig = 0;
-    se->Trigger(inittrig, 2);
-  }
   eventcnt++;
-  if (se->Verbosity() > 1)
-  {
-    printf(" # Events: %d Trigger: 0x%x\n", eventcnt, se->Trigger(2));
-  }
+#ifdef USE_MUTEX
   pthread_mutex_lock(&mutex);
+#endif
   FrameWorkVars->SetBinContent(CURRENTTIMEBIN, (Stat_t) se->CurrentTicks());
   se->EventNumber(evt->getEvtSequence());
   se->process_event(evt);
+#ifdef USE_MUTEX
   pthread_mutex_unlock(&mutex);
+#endif
   return 0;
 }
 
@@ -315,9 +239,11 @@ int setup_server()
 static void *server(void * /* arg */)
 {
   OnlMonServer *Onlmonserver = OnlMonServer::instance();
-  int MoniPort = MONIPORT;
+  int MoniPort = OnlMonDefs::MONIPORT;
   //  int thread_arg[5];
+#ifdef USE_MUTEX
   pthread_mutex_lock(&mutex);
+#endif
   TServerSocket *ss = nullptr;
   sleep(5);
   do
@@ -329,8 +255,7 @@ static void *server(void * /* arg */)
     ss = new TServerSocket(MoniPort, kTRUE);
     // Accept a connection and return a full-duplex communication socket.
     Onlmonserver->PortNumber(MoniPort);
-    MoniPort++;
-    if ((MoniPort - MONIPORT) >= NUMMONIPORT)
+    if ((MoniPort - OnlMonDefs::MONIPORT) >= OnlMonDefs::NUMMONIPORT)
     {
       std::ostringstream msg;
       msg << "Too many Online Monitors running on this machine, bailing out";
@@ -338,6 +263,7 @@ static void *server(void * /* arg */)
 
       exit(1);
     }
+    MoniPort++;
     if (!ss->IsValid())
     {
       printf("Ignore ROOT error about socket in use, I try another one\n");
@@ -351,14 +277,16 @@ static void *server(void * /* arg */)
   int isock = gROOT->GetListOfSockets()->IndexOf(ss);
   gROOT->GetListOfSockets()->RemoveAt(isock);
   sleep(10);
+#ifdef USE_MUTEX
   pthread_mutex_unlock(&mutex);
+#endif
 again:
   TSocket *s0 = ss->Accept();
   if (!s0)
   {
-    std::cout << "Server socket " << MONIPORT
+    std::cout << "Server socket " << OnlMonDefs::MONIPORT
               << " in use, either go to a different node or" << std::endl
-              << "change MONIPORT in server/PortNumber.h and recompile" << std::endl
+              << "change MONIPORT in server/OnlMonDefs.h and recompile" << std::endl
               << "server and client" << std::endl;
     exit(1);
   }
@@ -372,12 +300,16 @@ again:
     adr.Print();
   }
   //  std::cout << "try locking mutex" << std::endl;
+#ifdef USE_MUTEX
   pthread_mutex_lock(&mutex);
-  //std::cout << "got mutex" << std::endl;
+#endif
+  // std::cout << "got mutex" << std::endl;
   handleconnection(s0);
-  //std::cout << "try releasing mutex" << std::endl;
+  // std::cout << "try releasing mutex" << std::endl;
+#ifdef USE_MUTEX
   pthread_mutex_unlock(&mutex);
-  //std::cout << "mutex released" << std::endl;
+#endif
+  // std::cout << "mutex released" << std::endl;
   delete s0;
   /*
     if (!aargh)
@@ -387,8 +319,8 @@ again:
     aargh->Run();
     }
   */
-  //std::cout << "closing socket" << std::endl;
-  //s0->Close();
+  // std::cout << "closing socket" << std::endl;
+  // s0->Close();
   goto again;
 }
 
@@ -412,7 +344,7 @@ void handleconnection(void *arg)
   */
   TMessage *mess = nullptr;
   TMessage outgoing(kMESS_OBJECT);
-  while (1)
+  while (true)
   {
     if (Onlmonserver->Verbosity() > 2)
     {
@@ -426,55 +358,61 @@ void handleconnection(void *arg)
     }
     if (mess->What() == kMESS_STRING)
     {
-      char str[64];
-      mess->ReadString(str, 64);
+      char strchr[OnlMonDefs::MSGLEN];
+      mess->ReadString(strchr, OnlMonDefs::MSGLEN);
       delete mess;
-      mess = 0;
+      mess = nullptr;
+      std::string str = strchr;
       if (Onlmonserver->Verbosity() > 2)
       {
-        std::cout << "received message" << str << std::endl;
+        std::cout << "received message: " << str << std::endl;
       }
-      if (!strcmp(str, "Finished"))
+      if (str == "Finished")
       {
         break;
       }
-      else if (!strcmp(str, "WriteRootFile"))
+      else if (str == "WriteRootFile")
       {
         Onlmonserver->WriteHistoFile();
         s0->Send("Finished");
         break;
       }
-      else if (!strcmp(str, "Ack"))
+      else if (str == "Ack")
       {
         continue;
       }
-      else if (!strcmp(str, "HistoList"))
+      else if (str == "HistoList")
       {
         if (Onlmonserver->Verbosity() > 2)
         {
           std::cout << "number of histos: " << Onlmonserver->nHistos() << std::endl;
         }
-        for (unsigned int i = 0; i < Onlmonserver->nHistos(); i++)
+        for (auto monitors = Onlmonserver->monibegin(); monitors != Onlmonserver->moniend(); ++monitors)
         {
-          if (Onlmonserver->Verbosity() > 2)
+          for (auto &histos : monitors->second)
           {
-            std::cout << "HistoName: " << Onlmonserver->getHistoName(i) << std::endl;
-          }
-          s0->Send(Onlmonserver->getHistoName(i).c_str());
-          int nbytes = s0->Recv(mess);
-          delete mess;
-          mess = 0;
-          if (nbytes <= 0)
-          {
-            std::ostringstream msg;
+            std::string subsyshisto = monitors->first + ' ' + histos.first;
+            if (Onlmonserver->Verbosity() > 2)
+            {
+              std::cout << "subsystem: " << monitors->first << ", histo: " << histos.first << std::endl;
+              std::cout << " sending: \"" << subsyshisto << "\"" << std::endl;
+            }
+            s0->Send(subsyshisto.c_str());
+            int nbytes = s0->Recv(mess);
+            delete mess;
+            mess = nullptr;
+            if (nbytes <= 0)
+            {
+              std::ostringstream msg;
 
-            msg << "Problem receiving message: return code: " << nbytes;
-            send_message(MSG_SEV_ERROR, msg.str());
+              msg << "Problem receiving message: return code: " << nbytes;
+              send_message(MSG_SEV_ERROR, msg.str());
+            }
           }
         }
         s0->Send("Finished");
       }
-      else if (!strcmp(str, "ALL"))
+      else if (str == "ALL")
       {
         if (Onlmonserver->Verbosity() > 2)
         {
@@ -491,17 +429,50 @@ void handleconnection(void *arg)
             outgoing.Reset();
             s0->Recv(mess);
             delete mess;
-            mess = 0;
+            mess = nullptr;
           }
         }
         s0->Send("Finished");
       }
-      else if (!strcmp(str, "LIST"))
+      else if (str.find("ISRUNNING") != std::string::npos)
+      {
+        std::string answer = "No";
+        unsigned int pos_space = str.find(' ');
+        std::string moniname = str.substr(pos_space + 1, str.size());
+        for (auto moniter = Onlmonserver->monitor_vec_begin(); moniter != Onlmonserver->monitor_vec_end(); ++moniter)
+        {
+          if ((*moniter)->Name() == moniname)
+          {
+            answer = "Yes";
+            break;
+          }
+        }
+        if (Onlmonserver->Verbosity() > 2)
+        {
+          std::cout << "got " << str << ", replied " << answer << std::endl;
+        }
+        s0->Send(answer.c_str());
+      }
+      else if (str == "LISTMONITORS")
       {
         s0->Send("go");
-        while (1)
+        for (auto moniter = Onlmonserver->monitor_vec_begin(); moniter != Onlmonserver->monitor_vec_end(); ++moniter)
         {
-          char strmess[200];
+          if (Onlmonserver->Verbosity() > 2)
+          {
+            std::cout << "sending " << (*moniter)->Name().c_str() << std::endl;
+          }
+          s0->Send((*moniter)->Name().c_str());
+        }
+        s0->Send("Finished");
+        break;
+      }
+      else if (str == "LIST")
+      {
+        s0->Send("go");
+        while (true)
+        {
+          char strmess[OnlMonDefs::MSGLEN];
           s0->Recv(mess);
           if (!mess)
           {
@@ -509,15 +480,21 @@ void handleconnection(void *arg)
           }
           if (mess->What() == kMESS_STRING)
           {
-            mess->ReadString(strmess, 200);
+            mess->ReadString(strmess, OnlMonDefs::MSGLEN);
             delete mess;
-            mess = 0;
-            if (!strcmp(strmess, "alldone"))
+            mess = nullptr;
+            if (std::string(strmess) == "alldone")
             {
               break;
             }
           }
-          TH1 *histo = Onlmonserver->getHisto(strmess);
+          std::string str1(strmess);
+          unsigned int pos_space = str1.find(' ');
+          if (Onlmonserver->Verbosity() > 2)
+          {
+            std::cout << __PRETTY_FUNCTION__ << " getting subsystem " << str1.substr(0, pos_space) << ", histo " << str1.substr(pos_space + 1, str1.size()) << std::endl;
+          }
+          TH1 *histo = Onlmonserver->getHisto(str1.substr(0, pos_space), str1.substr(pos_space + 1, str1.size()));
           if (histo)
           {
             outgoing.Reset();
@@ -527,7 +504,7 @@ void handleconnection(void *arg)
           }
           else
           {
-            s0->Send("unknown");
+            s0->Send("UnknownHisto");
           }
           //		  delete mess;
         }
@@ -535,7 +512,9 @@ void handleconnection(void *arg)
       }
       else
       {
-        TH1 *histo = Onlmonserver->getHisto(str);
+        std::string strstr(str);
+        unsigned int pos_space = str.find(' ');
+        TH1 *histo = Onlmonserver->getHisto(strstr.substr(0, pos_space), strstr.substr(pos_space + 1, str.size()));
         if (histo)
         {
           //		  const char *hisname = histo->GetName();

@@ -217,6 +217,14 @@ class SubSystemActionDraw : public SubSystemAction
   int Execute();
 };
 
+class SubSystemActionSavePlot : public SubSystemAction
+{
+ public:
+  SubSystemActionSavePlot(SubSystem* parent);
+  virtual ~SubSystemActionSavePlot(){};
+  int Execute();
+};
+
 class SubSystemActionDrawPS : public SubSystemAction
 {
  public:

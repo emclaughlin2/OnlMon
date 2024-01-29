@@ -1,0 +1,2 @@
+#do
+#export ONLMON_MAIN=$MYINSTALL

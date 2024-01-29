@@ -1,7 +1,7 @@
 #ifndef ONLMONSERVER_MESSAGESYSTEM_H
 #define ONLMONSERVER_MESSAGESYSTEM_H
 
-#include <OnlMonBase.h>
+#include "OnlMonBase.h"
 
 #include <map>
 #include <string>
@@ -13,7 +13,11 @@ class MessageSystem : public OnlMonBase
 {
  public:
   MessageSystem(const std::string &name);
-  virtual ~MessageSystem();
+  ~MessageSystem() override;
+
+ // delete copy ctor and assignment operator (cppcheck)
+  explicit MessageSystem(const MessageSystem&) = delete;
+  MessageSystem& operator=(const MessageSystem&) = delete;
 
   int send_message(const int msg_source, const int severity, const std::string &err_message, const int msgtype);
 

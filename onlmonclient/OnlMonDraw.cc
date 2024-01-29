@@ -16,6 +16,12 @@ int OnlMonDraw::Draw(const std::string & /* what */)
   return -1;
 }
 
+int OnlMonDraw::SavePlot(const std::string & /* what */, const std::string & /* type */)
+{
+  std::cout << "SavePlot not implemented by daughter class" << std::endl;
+  return -1;
+}
+
 int OnlMonDraw::MakePS(const std::string & /* what */)
 {
   std::cout << "MakePS not implemented by daughter class" << std::endl;

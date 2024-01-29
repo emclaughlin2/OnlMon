@@ -2,20 +2,15 @@ AUTOMAKE_OPTIONS = foreign
 
 AM_CPPFLAGS = \
   -I$(includedir) \
-  -I$(OFFLINE_MAIN)/include \
-  -I$(ONLINE_MAIN)/include/Event \
+  -I$(ONLINE_MAIN)/include \
   -I$(OPT_SPHENIX)/include \
   -isystem$(ROOTSYS)/include
 
 RINCLUDES = \
   -I$(includedir) \
-  -I$(OFFLINE_MAIN)/include \
   -I$(ONLINE_MAIN)/include \
   -I$(OPT_SPHENIX)/include \
   -I$(ROOTSYS)/include
-
-BUILT_SOURCES = \
-  testexternals.cc
 
 lib_LTLIBRARIES = \
   libonlmonserver.la \
@@ -24,17 +19,18 @@ lib_LTLIBRARIES = \
 libonlmonserver_funcs_la_LIBADD = \
   libonlmonserver.la \
   -L$(libdir) \
-  -L$(OFFLINE_MAIN)/lib \
-  -lphool \
+  -L$(ONLINE_MAIN)/lib \
   -lpmonitor \
   -lmessage
 
-libonlmonserver_la_LIBADD = \
+libonlmonserver_la_LDFLAGS = \
   -L$(libdir) \
-  -L$(OFFLINE_MAIN)/lib \
+  -L$(ONLINE_MAIN)/lib \
+  -L$(OPT_SPHENIX)/lib \
+  `root-config --libs` \
   -lmessage \
-  -lphool \
-  -lodbc++
+  -lodbc++ \
+  -lz
 
 
 noinst_HEADERS = \
@@ -44,10 +40,9 @@ pkginclude_HEADERS = \
   HistoBinDefs.h \
   OnlMon.h \
   OnlMonBase.h \
+  OnlMonDefs.h \
   OnlMonServer.h \
-  OnlMonStatus.h \
-  OnlMonTrigger.h \
-  PortNumber.h
+  OnlMonStatus.h
 
 libonlmonserver_funcs_la_SOURCES = \
   pmonitorInterface.cc
@@ -59,8 +54,8 @@ libonlmonserver_la_SOURCES = \
   OnlMonServer.cc \
   OnlMonStatusDB.cc
 
-#  OnlMonTrigger.cc
-#  TrigInfo.cc
+BUILT_SOURCES = \
+  testexternals.cc
 
 noinst_PROGRAMS = \
   testexternals

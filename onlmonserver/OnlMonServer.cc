@@ -2,15 +2,10 @@
 
 #include "OnlMon.h"
 #include "OnlMonStatusDB.h"
-#include "OnlMonTrigger.h"
 
-#include <MessageSystem.h>
+#include "MessageSystem.h"
 
 #include <Event/msg_profile.h>  // for MSG_SEV_ERROR, MSG_SEV...
-
-#include <phool/PHCompositeNode.h>
-#include <phool/phool.h>
-#include <phool/recoConsts.h>
 
 #include <TFile.h>
 #include <TH1.h>
@@ -21,8 +16,6 @@
 #include <odbc++/resultset.h>
 #include <odbc++/statement.h>  // for Statement
 #include <odbc++/types.h>      // for SQLException
-
-#include <boost/tokenizer.hpp>
 
 #include <zlib.h>
 
@@ -58,9 +51,10 @@ OnlMonServer *OnlMonServer::instance()
 OnlMonServer::OnlMonServer(const std::string &name)
   : OnlMonBase(name)
 {
+#ifdef USE_MUTEX
   pthread_mutex_init(&mutex, nullptr);
+#endif
   MsgSystem[ThisName] = new MessageSystem(ThisName);
-  //  onltrig = new OnlMonTrigger();
   statusDB = new OnlMonStatusDB();
   RunStatusDB = new OnlMonStatusDB("onlmonrunstatus");
   InitAll();
@@ -69,29 +63,49 @@ OnlMonServer::OnlMonServer(const std::string &name)
 
 OnlMonServer::~OnlMonServer()
 {
+#ifdef USE_MUTEX
   pthread_mutex_lock(&mutex);
+#endif
   if (int tret = pthread_cancel(serverthreadid))
   {
-    std::cout << PHWHERE << "pthread cancel returned error: " << tret << std::endl;
+    std::cout << __PRETTY_FUNCTION__ << "pthread cancel returned error: " << tret << std::endl;
   }
   delete serverrunning;
+
+#ifdef USE_MUTEX
   pthread_mutex_destroy(&mutex);
+#endif
   while (MonitorList.begin() != MonitorList.end())
   {
     delete MonitorList.back();
     MonitorList.pop_back();
   }
-  delete topNode;
-  delete onltrig;
   delete statusDB;
   delete RunStatusDB;
-
-  while (Histo.begin() != Histo.end())
+  while(MonitorHistoSet.begin() !=  MonitorHistoSet.end())
   {
-    delete Histo.begin()->second;
-    Histo.erase(Histo.begin());
+    while(MonitorHistoSet.begin()->second.begin() != MonitorHistoSet.begin()->second.end())
+    {
+      if (CommonHistoMap.find(MonitorHistoSet.begin()->second.begin()->second->GetName()) == CommonHistoMap.end())
+      {
+      delete MonitorHistoSet.begin()->second.begin()->second;
+      }
+      else
+      {
+	if (Verbosity() > 2)
+	{
+	std::cout << "not deleting " << MonitorHistoSet.begin()->second.begin()->second->GetName() << std::endl;
+	}
+      }
+      MonitorHistoSet.begin()->second.erase(MonitorHistoSet.begin()->second.begin());
+    }
+    MonitorHistoSet.erase(MonitorHistoSet.begin());
   }
-
+  while(CommonHistoMap.begin() != CommonHistoMap.end())
+  {
+    delete CommonHistoMap.begin()->second;
+    CommonHistoMap.erase(CommonHistoMap.begin());
+  }
   while (MsgSystem.begin() != MsgSystem.end())
   {
     delete MsgSystem.begin()->second;
@@ -110,22 +124,20 @@ void OnlMonServer::InitAll()
     exit(1);
   }
   serverrunning = new TH1F("ServerRunning", "ServerRunning", 1, 0, 1);
-  unsigned int inittrig = 0;
-  for (int i = 0; i < 3; i++)
-  {
-    Trigger(inittrig, i);
-  }
-  topNode = new PHCompositeNode("TOP");
   return;
 }
 
 void OnlMonServer::dumpHistos(const std::string &filename)
 {
-  std::map<const std::string, TH1 *>::const_iterator hiter;
-  TFile *hfile = new TFile(filename.c_str(), "RECREATE", "Created by Online Monitor", compression_level);
-  for (hiter = Histo.begin(); hiter != Histo.end(); ++hiter)
+  TFile *hfile = TFile::Open(filename.c_str(), "RECREATE", "Created by Online Monitor");
+  for (auto &moniiter : MonitorHistoSet)
   {
-    hiter->second->Write();
+    std::cout << "saving " << moniiter.first << std::endl;
+    for (auto &histiter : moniiter.second)
+    {
+      std::cout << "saving " << histiter.first << std::endl;
+      histiter.second->Write();
+    }
   }
   hfile->Close();
   delete hfile;
@@ -134,8 +146,7 @@ void OnlMonServer::dumpHistos(const std::string &filename)
 
 void OnlMonServer::registerCommonHisto(TH1 *h1d)
 {
-  registerHisto("COMMON", h1d->GetName(), h1d, 0);
-  CommonHistoSet.insert(h1d->GetName());
+  CommonHistoMap.insert(std::make_pair(h1d->GetName(), h1d));
   return;
 }
 
@@ -147,26 +158,61 @@ void OnlMonServer::registerHisto(const OnlMon *monitor, TH1 *h1d)
 
 void OnlMonServer::registerHisto(const std::string &monitorname, const std::string &hname, TH1 *h1d, const int replace)
 {
-  MonitorHistoSet[monitorname].insert(hname);
-  registerHisto(hname, h1d, replace);
+  if (hname.find(' ') != std::string::npos)
+  {
+    std::cout << "No empty spaces in registered histogram names : " << hname << std::endl;
+    exit(1);
+  }
+  auto moniiter = MonitorHistoSet.find(monitorname);
+  if (moniiter == MonitorHistoSet.end())
+  {
+    std::map<std::string, TH1 *> histo;
+    histo[hname] = h1d;
+    std::cout << __PRETTY_FUNCTION__ << " inserting " << monitorname << " hname " << hname << std::endl;
+    MonitorHistoSet.insert(std::make_pair(monitorname, histo));
+    return;
+  }
+  auto histoiter = moniiter->second.find(hname);
+  if (histoiter == moniiter->second.end())
+  {
+    moniiter->second.insert(std::make_pair(hname, h1d));
+  }
+  else
+  {
+    if (replace)
+    {
+      delete histoiter->second;
+      histoiter->second = h1d;
+    }
+    else
+    {
+      std::cout << "Histogram " << hname << " already registered with " << monitorname
+                << ", it will not be overwritten" << std::endl;
+    }
+  }
   return;
 }
 
 void OnlMonServer::registerHisto(const std::string &hname, TH1 *h1d, const int replace)
 {
-  const std::string tmpstr = hname;
-  std::map<const std::string, TH1 *>::const_iterator histoiter = Histo.find(tmpstr);
+  if (hname.find(' ') != std::string::npos)
+  {
+    std::cout << "No empty spaces in registered histogram names : " << hname << std::endl;
+    exit(1);
+  }
+  const std::string &tmpstr = hname;
+  std::map<const std::string, TH1 *>::const_iterator histoiter = CommonHistoMap.find(tmpstr);
   std::ostringstream msg;
   int histoexist;
   TH1 *delhis;
-  if (histoiter != Histo.end())
+  if (histoiter != CommonHistoMap.end())
   {
     delhis = histoiter->second;
     histoexist = 1;
   }
   else
   {
-    delhis = 0;
+    delhis = nullptr;
     histoexist = 0;
   }
   if (histoexist && replace == 0)
@@ -184,12 +230,12 @@ void OnlMonServer::registerHisto(const std::string &hname, TH1 *h1d, const int r
       if (strcmp(h1d->GetName(), tmpstr.c_str()))
       {
         msg.str("");
-        msg << PHWHERE << "Histogram " << h1d->GetName()
+        msg << __PRETTY_FUNCTION__ << "Histogram " << h1d->GetName()
             << " at " << h1d << " renamed to " << tmpstr;
         send_message(MSG_SEV_INFORMATIONAL, msg.str(), 3);
       }
     }
-    Histo[tmpstr] = h1d;
+    CommonHistoMap[tmpstr] = h1d;
     if (delhis)
     {
       delete delhis;
@@ -237,8 +283,8 @@ void OnlMonServer::registerMonitor(OnlMon *Monitor)
 
 TH1 *OnlMonServer::getHisto(const unsigned int ihisto) const
 {
-  std::map<const std::string, TH1 *>::const_iterator histoiter = Histo.begin();
-  unsigned int size = Histo.size();
+  std::map<const std::string, TH1 *>::const_iterator histoiter = CommonHistoMap.begin();
+  unsigned int size = CommonHistoMap.size();
   if (Verbosity() > 3)
   {
     std::ostringstream msg;
@@ -267,8 +313,8 @@ TH1 *OnlMonServer::getHisto(const unsigned int ihisto) const
 const std::string
 OnlMonServer::getHistoName(const unsigned int ihisto) const
 {
-  std::map<const std::string, TH1 *>::const_iterator histoiter = Histo.begin();
-  unsigned int size = Histo.size();
+  std::map<const std::string, TH1 *>::const_iterator histoiter = CommonHistoMap.begin();
+  unsigned int size = CommonHistoMap.size();
   if (verbosity > 3)
   {
     std::ostringstream msg;
@@ -293,10 +339,34 @@ OnlMonServer::getHistoName(const unsigned int ihisto) const
   return nullptr;
 }
 
-TH1 *OnlMonServer::getHisto(const std::string &hname) const
+TH1 *OnlMonServer::getHisto(const std::string &subsys, const std::string &hname) const
 {
-  std::map<const std::string, TH1 *>::const_iterator histoiter = Histo.find(hname);
-  if (histoiter != Histo.end())
+  if (Verbosity() > 2)
+  {
+    std::cout << __PRETTY_FUNCTION__ << " checking for subsys " << subsys << ", hname " << hname << std::endl;
+  }
+  auto moniiter = MonitorHistoSet.find(subsys);
+  if (moniiter != MonitorHistoSet.end())
+  {
+    auto histoiter = moniiter->second.find(hname);
+    if (histoiter != moniiter->second.end())
+    {
+      return histoiter->second;
+    }
+  }
+  std::ostringstream msg;
+
+  msg << "OnlMonServer::getHisto: ERROR Unknown Histogram " << hname
+      << ", The following are implemented: ";
+  send_message(MSG_SEV_ERROR, msg.str(), 7);
+  Print("HISTOS");
+  return nullptr;
+}
+
+TH1 *OnlMonServer::getCommonHisto(const std::string &hname) const
+{
+  std::map<const std::string, TH1 *>::const_iterator histoiter = CommonHistoMap.find(hname);
+  if (histoiter != CommonHistoMap.end())
   {
     return histoiter->second;
   }
@@ -312,17 +382,16 @@ TH1 *OnlMonServer::getHisto(const std::string &hname) const
 int OnlMonServer::run_empty(const int nevents)
 {
   int iret = 0;
-  for (int i = 0; i<nevents; i++)
+  for (int i = 0; i < nevents; i++)
   {
     iret = process_event(nullptr);
-    if (iret )
+    if (iret)
     {
       break;
     }
   }
   return iret;
 }
-
 
 int OnlMonServer::process_event(Event *evt)
 {
@@ -350,7 +419,15 @@ int OnlMonServer::Reset()
     i += (*iter)->Reset();
   }
   std::map<const std::string, TH1 *>::const_iterator hiter;
-  for (hiter = Histo.begin(); hiter != Histo.end(); ++hiter)
+  for (auto &moniiter : MonitorHistoSet)
+  {
+     for (auto &histiter : moniiter.second)
+    {
+      histiter.second->Reset();
+    }
+  }
+
+  for (hiter = CommonHistoMap.begin(); hiter != CommonHistoMap.end(); ++hiter)
   {
     hiter->second->Reset();
   }
@@ -366,28 +443,20 @@ int OnlMonServer::Reset()
 int OnlMonServer::BeginRun(const int runno)
 {
   int i = 0;
-  if (onltrig)
+  i = CacheRunDB(runno);
+  if (i)
   {
-    onltrig->RunNumber(runno);
+    printf("bad return code from CacheRunDB(%d): %d\n", runno, i);
+    i = 0;
   }
-
-//  i = CacheRunDB(runno);
-//  if (i)
-//  {
-//    printf("bad return code from CacheRunDB(%d): %d\n", runno, i);
-//    i = 0;
-//  }
 
   std::vector<OnlMon *>::iterator iter;
   activepacketsinit = 0;
-  scaledtrigmask = 0xFFFFFFFF;
-  scaledtrigmask_used = 0;
   for (iter = MonitorList.begin(); iter != MonitorList.end(); ++iter)
   {
     (*iter)->BeginRunCommon(runno, this);
     i += (*iter)->BeginRun(runno);
   }
-  DisconnectDB();
   return i;
 }
 
@@ -402,173 +471,98 @@ int OnlMonServer::EndRun(const int runno)
   return i;
 }
 
-void OnlMonServer::Print(const std::string &what) const
+void OnlMonServer::Print(const std::string &what, std::ostream& os) const
 {
+  if (what == "ALL" || what == "PORT")
+  {
+    utsname ThisNode;
+    uname(&ThisNode);
+    os << "--------------------------------------" << std::endl << std::endl;
+    os << "Server running on " << ThisNode.nodename
+       << " and is listening on port " << PortNumber() << std::endl
+       << std::endl;
+  }
   if (what == "ALL" || what == "HISTOS")
   {
-    std::set<std::string> cached_hists;
-    std::map<std::string, std::set<std::string> >::const_iterator mhistiter;
-    printf("--------------------------------------\n\n");
-    printf("List of Assigned histograms in OnlMonServer:\n");
-    for (mhistiter = MonitorHistoSet.begin(); mhistiter != MonitorHistoSet.end(); ++mhistiter)
+    os << "--------------------------------------" << std::endl << std::endl;
+    os << "List of Assigned histograms in OnlMonServer:" << std::endl << std::endl;
+    for (auto &moniiter : MonitorHistoSet)
     {
-      std::set<std::string> hists = mhistiter->second;
-      std::set<std::string>::const_iterator siter;
-      for (siter = hists.begin(); siter != hists.end(); ++siter)
+      os << "Monitor " << moniiter.first << std::endl;
+      for (auto &histiter : moniiter.second)
       {
-        printf("%s: %s\n", (mhistiter->first).c_str(), (*siter).c_str());
-        cached_hists.insert(*siter);
+        os <<  moniiter.first << " " << histiter.first
+	   << " at " << histiter.second << std::endl;
       }
     }
     // loop over the map and print out the content (name and location in memory)
-    printf("\n--------------------------------------\n\n");
-    printf("List of unassigned Histograms in OnlMonServer:\n");
-    std::map<const std::string, TH1 *>::const_iterator hiter;
-    for (hiter = Histo.begin(); hiter != Histo.end(); ++hiter)
+    os << std::endl << "--------------------------------------" << std::endl << std::endl;
+    os << "List of Common Histograms in OnlMonServer"  << std::endl;
+    for (auto &hiter : CommonHistoMap)
     {
-      if (cached_hists.find(hiter->first) == cached_hists.end())
-      {
-        //	      printf("%s is at 0x%16x\n",(hiter->first).c_str(),(unsigned int)hiter->second);
-      }
+      os << hiter.first << std::endl;
     }
-    printf("\n");
+    os << std::endl;
   }
   if (what == "ALL" || what == "MONITOR")
   {
     // loop over the map and print out the content (name and location in memory)
-    printf("--------------------------------------\n\n");
-    printf("List of Monitors with registered histos in OnlMonServer:\n");
+    os << "--------------------------------------" << std::endl << std::endl;
+    os << "List of Monitors with registered histos in OnlMonServer:"  << std::endl;
 
-    std::vector<OnlMon *>::const_iterator miter;
-    std::map<std::string, std::set<std::string> >::const_iterator mhisiter;
-    for (miter = MonitorList.begin(); miter != MonitorList.end(); ++miter)
+    for (auto &miter : MonitorList)
     {
-      printf("%s\n", (*miter)->Name().c_str());
-      mhisiter = MonitorHistoSet.find((*miter)->Name());
-      std::set<std::string>::const_iterator siter;
-      if (mhisiter != MonitorHistoSet.end())
-      {
-        std::set<std::string> hists = mhisiter->second;
-        for (siter = hists.begin(); siter != hists.end(); ++siter)
-        {
-          printf("%s: %s\n", (*miter)->Name().c_str(), (*siter).c_str());
-        }
-      }
+      os << miter->Name() << std::endl;
     }
-    printf("\n");
-  }
-  if (what == "ALL" || what == "TRIGGER")
-  {
-    if (onltrig)
-    {
-      onltrig->Print(what);
-    }
+    os << std::endl;
   }
   if (what == "ALL" || what == "ACTIVE")
   {
-    printf("--------------------------------------\n\n");
-    printf("List of active packets:\n");
+    os << "--------------------------------------" << std::endl << std::endl;
+    os << "List of active packets:" << std::endl;
     std::set<unsigned int>::const_iterator iter;
     for (iter = activepackets.begin(); iter != activepackets.end(); ++iter)
     {
-      printf("%d\n", *iter);
+      os << *iter << std::endl;
     }
   }
-  return;
+return;
 }
 
-int OnlMonServer::Trigger(const std::string &trigname, const unsigned short int i)
+void OnlMonServer::PrintFile(const std::string &fname) const
 {
-  unsigned int ibit = getLevel1Bit(trigname);
-
-  if (trigger[i] & ibit)
-  {
-    return 1;
-  }
-  return 0;
+  std::ofstream fout(fname);
+  Print("ALL",fout);
+  fout.close();
 }
 
 void OnlMonServer::RunNumber(const int irun)
 {
   runnumber = irun;
-  recoConsts *rc = recoConsts::instance();
-  rc->set_IntFlag("RUNNUMBER", irun);
+  // recoConsts *rc = recoConsts::instance();
+  // rc->set_IntFlag("RUNNUMBER", irun);
   return;
 }
 
 int OnlMonServer::WriteHistoFile()
 {
-  utsname ThisNode;
-  uname(&ThisNode);
-  std::string nn = ThisNode.nodename;
-  std::string mm = nn.substr(0, nn.find("."));  // strip the domain (all chars after first .)
-  std::ostringstream dirname, filename;
-  // filename is Run_<runno>_<monitor>_<nodename>.root
-  if (getenv("ONLMON_SAVEDIR"))
+  for (auto &moniiter : MonitorHistoSet)
   {
-    dirname << getenv("ONLMON_SAVEDIR") << "/";
-  }
-  int irun = RunNumber();
-  std::map<std::string, std::set<std::string> >::const_iterator mhistiter;
-  // assignedhists set stores all encountered histograms so histos which are not accounted
-  // for can be saved
-  std::set<std::string> assignedhists = CommonHistoSet;
-  std::set<std::string>::const_iterator siter;
-  std::map<const std::string, TH1 *>::const_iterator hiter;
-  for (mhistiter = MonitorHistoSet.begin(); mhistiter != MonitorHistoSet.end(); ++mhistiter)
-  {
-    if (mhistiter->first == "COMMON")
+    std::string dirname = "./";
+    if (getenv("ONLMON_SAVEDIR"))
     {
-      continue;
+      dirname = std::string(getenv("ONLMON_SAVEDIR")) + "/";
     }
-    filename.str("");
-    filename << dirname.str() << "Run_" << irun << "_" << mhistiter->first << "_" << mm << "_" << PortNumber() << ".root";
-    TFile *hfile = new TFile(filename.str().c_str(), "RECREATE", "Created by Online Monitor", compression_level);
-    for (siter = CommonHistoSet.begin(); siter != CommonHistoSet.end(); ++siter)
+    std::string filename = dirname + "Run_" + std::to_string(RunNumber()) + "-" + moniiter.first + ".root";
+    if (Verbosity() > 2)
     {
-      hiter = Histo.find(*siter);
-      if (hiter != Histo.end())
-      {
-        hiter->second->Write();
-      }
-      else
-      {
-        std::cout << "could not locate histogram " << *siter << std::endl;
-      }
+      std::cout << "saving histos for " << moniiter.first << " in " << filename << std::endl;
     }
-    for (siter = (mhistiter->second).begin(); siter != (mhistiter->second).end(); ++siter)
+    TFile *hfile = TFile::Open(filename.c_str(), "RECREATE", "Created by Online Monitor");
+    for (auto &histiter : moniiter.second)
     {
-      hiter = Histo.find(*siter);
-      assignedhists.insert(*siter);
-      if (hiter != Histo.end())
-      {
-        hiter->second->Write();
-      }
-      else
-      {
-        std::cout << "could not locate histogram " << *siter << std::endl;
-      }
+      histiter.second->Write();
     }
-    hfile->Close();
-    delete hfile;
-  }
-  TFile *hfile = 0;
-  filename.str("");
-  filename << dirname.str() << "Run_" << irun << "_" << mm << "_"
-           << PortNumber() << ".root";
-  for (hiter = Histo.begin(); hiter != Histo.end(); ++hiter)
-  {
-    if (assignedhists.find(hiter->first) == assignedhists.end())
-    {
-      if (!hfile)
-      {
-        hfile = new TFile(filename.str().c_str(), "RECREATE", "Created by Online Monitor", compression_level);
-      }
-      hiter->second->Write();
-    }
-  }
-  if (hfile)
-  {
     hfile->Close();
     delete hfile;
   }
@@ -605,51 +599,6 @@ int OnlMonServer::send_message(const int severity, const std::string &err_messag
   std::map<std::string, MessageSystem *>::const_iterator iter = MsgSystem.find(ThisName);
   int iret = iter->second->send_message(MSG_SOURCE_UNSPECIFIED, severity, err_message, msgtype);
   return iret;
-}
-
-OnlMonTrigger *
-OnlMonServer::OnlTrig()
-{
-  // if (!onltrig)
-  //   {
-  //     onltrig = new OnlMonTrigger();
-  //   }
-  return nullptr;
-}
-
-void OnlMonServer::TrigMask(const std::string &trigname, const unsigned int bitmask)
-{
-  onltrig->TrigMask(trigname, bitmask);
-  return;
-}
-
-unsigned int
-OnlMonServer::getLevel1Bit(const std::string &name)
-{
-  return onltrig->getLevel1Bit(name);
-}
-
-unsigned int
-OnlMonServer::AddToTriggerMask(const std::string &name)
-{
-  unsigned int mask = getLevel1Bit(name);
-  unsigned int newmask = AddScaledTrigMask(mask);
-  return newmask;
-}
-
-unsigned int
-OnlMonServer::AddScaledTrigMask(const unsigned int mask)
-{
-  if (mask)
-  {
-    if (!scaledtrigmask_used)
-    {
-      scaledtrigmask = 0;
-      scaledtrigmask_used = 1;
-    }
-    scaledtrigmask |= mask;
-  }
-  return scaledtrigmask;
 }
 
 int OnlMonServer::WriteLogFile(const std::string &name, const std::string &message) const
@@ -690,282 +639,6 @@ int OnlMonServer::WriteLogFile(const std::string &name, const std::string &messa
   return 0;
 }
 
-int OnlMonServer::parse_granuleDef(std::set<std::string> &pcffilelist)
-{
-  std::ostringstream filenam;
-  if (getenv("ONLINE_CONFIGURATION"))
-  {
-    filenam << getenv("ONLINE_CONFIGURATION") << "/rc/hw/";
-  }
-  filenam << "granuleDef.pcf";
-  std::string FullLine;  // a complete line in the config file
-  std::ifstream infile;
-  infile.open(filenam.str().c_str(), std::ifstream::in);
-  if (!infile)
-  {
-    if (filenam.str().find("gl1test.pcf") == std::string::npos)
-    {
-      std::ostringstream msg;
-      msg << "Could not open " << filenam.str();
-      send_message(MSG_SEV_ERROR, msg.str(), 7);
-    }
-    return -1;
-  }
-  getline(infile, FullLine);
-  boost::char_separator<char> sep("/");
-  typedef boost::tokenizer<boost::char_separator<char> > tokenizer;
-  while (!infile.eof())
-  {
-    if (FullLine.find("label:") != std::string::npos)
-    {
-      tokenizer tokens(FullLine, sep);
-      tokenizer::iterator tok_iter = tokens.begin();
-      ++tok_iter;
-      if (verbosity > 1)
-      {
-        std::cout << "pcf file: " << *tok_iter << std::endl;
-      }
-      pcffilelist.insert(*tok_iter);
-    }
-    getline(infile, FullLine);
-  }
-  infile.close();
-  return 0;
-}
-
-int OnlMonServer::LoadLL1Packets()
-{
-  std::ostringstream filenam;
-  if (getenv("ONLINE_CONFIGURATION"))
-  {
-    filenam << getenv("ONLINE_CONFIGURATION") << "/rc/hw/";
-  }
-  filenam << "Level1DD.pcf";
-  std::string FullLine;  // a complete line in the config file
-  std::ifstream infile;
-  infile.open(filenam.str().c_str(), std::ifstream::in);
-  if (!infile)
-  {
-    std::ostringstream msg;
-    msg << "Could not open " << filenam.str();
-    send_message(MSG_SEV_ERROR, msg.str(), 7);
-    return -1;
-  }
-  getline(infile, FullLine);
-  std::string::size_type pos1;
-  while (!infile.eof())
-  {
-    if (FullLine.find("LEVEL1_HITFORMAT") != std::string::npos)
-    {
-      if ((pos1 = FullLine.find("autogenerate_default0")) != std::string::npos)
-      {
-        FullLine.erase(0, pos1);  // erase all before autogenerate_default0 std::string
-        if ((pos1 = FullLine.find(",")) != std::string::npos)
-        {
-          FullLine.erase(0, pos1 + 1);  // erase all before and including , std::string
-          // erase the next 20 fields separated by , (hitformat and size)
-          int n = 0;
-          while (n++ <= 20)
-          {
-            if ((pos1 = FullLine.find(",")) != std::string::npos)
-            {
-              FullLine.erase(0, pos1 + 1);  // erase all before and including , std::string
-            }
-          }
-          // whats left is the comma separated list of ll1 packets
-          while (FullLine.size() > 0)
-          {
-            pos1 = FullLine.find(",");
-            std::string packetidstr;
-            if (pos1 != std::string::npos)
-            {
-              packetidstr = FullLine.substr(0, pos1);
-              FullLine.erase(0, pos1 + 1);
-            }
-            else
-            {
-              packetidstr = FullLine;
-              FullLine.erase();
-            }
-            std::istringstream line;
-            line.str(packetidstr);
-            unsigned int packetid;
-            line >> packetid;
-            if (packetid > 0)
-            {
-              activepackets.insert(packetid);
-            }
-          }
-        }
-      }
-    }
-    getline(infile, FullLine);
-  }
-
-  infile.close();
-  return 0;
-}
-
-int OnlMonServer::LoadActivePackets()
-{
-  clearactivepackets();
-  // LL1 packets are special
-  LoadLL1Packets();
-  std::set<std::string> pcffiles;
-  parse_granuleDef(pcffiles);
-  std::set<std::string>::const_iterator piter;
-  for (piter = pcffiles.begin(); piter != pcffiles.end(); ++piter)
-  {
-    parse_pcffile(*piter);
-  }
-  return 0;
-}
-
-void OnlMonServer::parse_pcffile(const std::string &lfn)
-{
-  std::ostringstream filenam;
-  if (getenv("ONLINE_CONFIGURATION"))
-  {
-    filenam << getenv("ONLINE_CONFIGURATION") << "/rc/hw/";
-  }
-  filenam << lfn;
-
-  std::set<unsigned int> disabled_packets;
-  std::string FullLine;  // a complete line in the config file
-  std::ifstream infile;
-  infile.open(filenam.str().c_str(), std::ifstream::in);
-  if (!infile)
-  {
-    if (filenam.str().find("gl1test.pcf") == std::string::npos)
-    {
-      std::ostringstream msg;
-      msg << "LoadActivePackets: Could not open " << filenam.str();
-      send_message(MSG_SEV_WARNING, msg.str(), 7);
-    }
-    return;
-  }
-  getline(infile, FullLine);
-  int checkreadoutflag = 0;
-  std::string::size_type pos1;
-  std::string::size_type pos2;
-  std::vector<unsigned int> pktids;
-  while (!infile.eof())
-  {
-    // find the line with packet ids
-    if ((pos1 = FullLine.find("packetid")) != std::string::npos)
-    {
-      FullLine.erase(0, pos1);  // erase all before packetid std::string
-      while ((pos1 = FullLine.find(":")) != std::string::npos)
-      {
-        pos2 = FullLine.find(",");
-        // search the int between the ":" and the ","
-        std::string packetidstr = FullLine.substr(pos1 + 1, pos2 - (pos1 + 1));
-        std::istringstream line;
-        line.str(packetidstr);
-        unsigned int packetid;
-        line >> packetid;
-        if (packetid > 0)
-        {
-          pktids.push_back(packetid);
-        }
-        // erase this entry from the line
-        FullLine.erase(0, pos2 + 1);
-      }
-      checkreadoutflag = 1;
-    }
-    if (checkreadoutflag)
-    {
-      if (FullLine.find("readout") != std::string::npos)
-      {
-        if (FullLine.find("readout1") != std::string::npos)
-        {
-          if (FullLine.find("YES") != std::string::npos)
-          {
-            activepackets.insert(pktids[0]);
-          }
-          else
-          {
-            disabled_packets.insert(pktids[0]);
-          }
-        }
-        else if (FullLine.find("readout2") != std::string::npos)
-        {
-          if (FullLine.find("YES") != std::string::npos)
-          {
-            activepackets.insert(pktids[1]);
-          }
-          else
-          {
-            disabled_packets.insert(pktids[1]);
-          }
-          checkreadoutflag = 0;
-          pktids.clear();
-        }
-        else
-        {
-          // only add packets if the readout is set to yes
-          if (FullLine.find("YES") != std::string::npos)
-          {
-            std::vector<unsigned int>::const_iterator viter;
-            for (viter = pktids.begin(); viter != pktids.end(); ++viter)
-            {
-              activepackets.insert(*viter);
-            }
-          }
-          else
-          {
-            std::vector<unsigned int>::const_iterator viter;
-            for (viter = pktids.begin(); viter != pktids.end(); ++viter)
-            {
-              disabled_packets.insert(*viter);
-            }
-          }
-          checkreadoutflag = 0;
-          pktids.clear();
-        }
-      }
-    }
-    getline(infile, FullLine);
-  }
-  infile.close();
-  if (verbosity > 1)
-  {
-    std::set<unsigned int>::const_iterator iter;
-    std::cout << "active packets: " << std::endl;
-    for (iter = activepackets.begin(); iter != activepackets.end(); ++iter)
-    {
-      std::cout << *iter << std::endl;
-    }
-    std::cout << "inactive packets: " << std::endl;
-    for (iter = disabled_packets.begin(); iter != disabled_packets.end(); ++iter)
-    {
-      std::cout << *iter << std::endl;
-    }
-  }
-}
-
-int OnlMonServer::IsPacketActive(const unsigned int ipkt)
-{
-  if (!activepacketsinit)
-  {
-    LoadActivePackets();
-    activepacketsinit = 1;
-  }
-  std::set<unsigned int>::const_iterator iter = activepackets.find(ipkt);
-  if (iter != activepackets.end())
-  {
-    return 1;
-  }
-  if (activepackets.empty())  // if list is empty, something is wrong, claim packet as active
-  {
-    std::ostringstream msg;
-    msg << "List of Active Packets empty";
-    send_message(MSG_SEV_ERROR, msg.str(), 8);
-    return 1;
-  }
-  return 0;
-}
-
 int OnlMonServer::CacheRunDB(const int runnoinput)
 {
   int runno = -1;
@@ -977,20 +650,13 @@ int OnlMonServer::CacheRunDB(const int runnoinput)
   {
     runno = 221;
   }
-  RunType = "UNKNOWN";
-  TriggerConfig = "UNKNOWN";
+  RunType = "PHYSICS";
   standalone = 0;
   cosmicrun = 0;
   borticks = 0;
-
-  if (runno == 0xFEE2DCB)  // dcm2 standalone runs have this runnumber
-  {
-    TriggerConfig = "StandAloneMode";
-    standalone = 1;
-    return 0;
-  }
-  odbc::Connection *con = 0;
-  odbc::Statement *query = 0;
+  return 0;
+  odbc::Connection *con = nullptr;
+  odbc::Statement *query = nullptr;
   std::ostringstream cmd;
   int iret = 0;
   try
@@ -1005,7 +671,7 @@ int OnlMonServer::CacheRunDB(const int runnoinput)
 
   query = con->createStatement();
   cmd << "select runnumber from run where runnumber = " << runno;
-  odbc::ResultSet *rs = 0;
+  odbc::ResultSet *rs = nullptr;
   int ncount = 10;
   while (ncount > 0)
   {
@@ -1100,10 +766,5 @@ int OnlMonServer::LookAtMe(OnlMon *Monitor, const int level, const std::string &
             << ", level: " << level
             << ", message: " << message
             << std::endl;
-  return 0;
-}
-
-int OnlMonServer::DisconnectDB()
-{
   return 0;
 }

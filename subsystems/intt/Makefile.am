@@ -7,8 +7,7 @@ SUBDIRS = calib
 
 AM_CPPFLAGS = \
   -I$(includedir) \
-  -I$(ONLMON_MAIN)/include \
-  -I$(OFFLINE_MAIN)/include \
+  -I$(ONLINE_MAIN)/include \
   -isystem$(ROOTSYS)/include
 
 lib_LTLIBRARIES = \
@@ -17,13 +16,13 @@ lib_LTLIBRARIES = \
 
 libonlinttmon_server_la_LIBADD = \
   -L$(libdir) \
-  -L$(OFFLINE_MAIN)/lib \
+  -L$(ONLINE_MAIN)/lib \
   -lonlmonserver \
   -lonlmondb
 
 libonlinttmon_client_la_LIBADD = \
   -L$(libdir) \
-  -L$(OFFLINE_MAIN)/lib \
+  -L$(ONLINE_MAIN)/lib \
   -lonlmonclient \
   -lonlmondb
 
@@ -31,14 +30,20 @@ libonlinttmon_client_la_LIBADD = \
 inttincludedir=$(pkgincludedir)/intt
 
 inttinclude_HEADERS = \
+  InttFelixMap.h \
   InttMon.h \
+  InttMonConstants.h \
   InttMonDraw.h
 
 libonlinttmon_server_la_SOURCES = \
-  InttMon.cc
+  InttFelixMap.cc \
+  InttMon.cc \
+  InttMonConstants.cc
 
 libonlinttmon_client_la_SOURCES = \
-  InttMonDraw.cc
+  InttFelixMap.cc \
+  InttMonDraw.cc \
+  InttMonConstants.cc
 
 bin_SCRIPTS = \
   InttMonSetup.csh \

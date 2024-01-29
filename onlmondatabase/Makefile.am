@@ -4,7 +4,7 @@ AM_LDFLAGS = -L$(libdir)
 
 AM_CPPFLAGS = \
   -I$(includedir) \
-  -I$(OFFLINE_MAIN)/include \
+  -I$(ONLINE_MAIN)/include \
   -I$(OPT_SPHENIX)/include \
   -isystem$(ROOTSYS)/include 
 

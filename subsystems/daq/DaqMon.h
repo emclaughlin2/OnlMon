@@ -4,7 +4,6 @@
 #include <onlmon/OnlMon.h>
 
 class Event;
-class OnlMonDB;
 class TH1;
 class TH2;
 
@@ -20,10 +19,8 @@ class DaqMon : public OnlMon
   int Reset();
 
  protected:
-  int DBVarInit();
   int evtcnt = 0;
   int idummy = 0;
-  OnlMonDB *dbvars = nullptr;
   TH1 *daqhist1 = nullptr;
   TH2 *daqhist2 = nullptr;
 };

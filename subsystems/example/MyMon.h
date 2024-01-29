@@ -11,7 +11,7 @@ class TH2;
 class MyMon : public OnlMon
 {
  public:
-  MyMon(const char *name = "MYMON");
+  MyMon(const std::string &name = "MYMON");
   virtual ~MyMon();
 
   int process_event(Event *evt);

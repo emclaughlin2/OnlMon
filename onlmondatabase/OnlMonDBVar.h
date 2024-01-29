@@ -1,6 +1,8 @@
 #ifndef ONLMONDATABASE_ONLMONDBVAR_H
 #define ONLMONDATABASE_ONLMONDBVAR_H
 
+#include <array>
+
 class OnlMonDBVar
 {
  public:
@@ -15,7 +17,7 @@ class OnlMonDBVar
 
  protected:
   int updated = 0;
-  float val[3];
+  std::array<float, 3> val;
 };
 
 #endif

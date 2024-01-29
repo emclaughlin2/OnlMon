@@ -2,13 +2,13 @@ AUTOMAKE_OPTIONS = foreign
 
 AM_CPPFLAGS = \
   -I$(includedir) \
-  -I$(OFFLINE_MAIN)/include \
+  -I$(ONLINE_MAIN)/include \
   -I$(OPT_SPHENIX)/include \
   -isystem$(ROOTSYS)/include 
 
 RINCLUDES = \
   -I$(includedir) \
-  -I$(OFFLINE_MAIN)/include \
+  -I$(ONLINE_MAIN)/include \
   -I$(OPT_SPHENIX)/include \
   -I$(ROOTSYS)/include 
 
@@ -33,6 +33,7 @@ libonlmonclient_la_SOURCES = \
 
 libonlmonclient_la_LDFLAGS = \
   -L$(libdir) \
+  -lstdc++fs \
   -lonlmondb \
   -luuid \
   `root-config --glibs`

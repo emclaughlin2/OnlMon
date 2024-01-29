@@ -3,9 +3,11 @@
 
 #include <onlmon/OnlMonDraw.h>
 
-#include <string>  // for allocator, string
 #include <TH2.h>
-class OnlMonDB;
+#include <TStyle.h>
+
+#include <string>  // for allocator, string
+
 class TCanvas;
 class TGraphErrors;
 class TPad;
@@ -13,30 +15,36 @@ class TPad;
 class HcalMonDraw : public OnlMonDraw
 {
  public:
-  HcalMonDraw(const std::string &name = "HCALMON"); // same name as server!
+  explicit HcalMonDraw(const std::string& name);
 
   ~HcalMonDraw() override {}
 
   int Init() override;
-  int Draw(const std::string &what = "ALL") override;
-  int MakePS(const std::string &what = "ALL") override;
-  int MakeHtml(const std::string &what = "ALL") override;
+  int Draw(const std::string& what = "ALL") override;
+  int MakeHtml(const std::string& what = "ALL") override;
+  int SavePlot(const std::string &what = "ALL", const std::string &type = "png") override;
+  void HandleEvent(int, int, int, TObject*);
   
- protected:
-  int MakeCanvas(const std::string &name);
-  int DrawFirst(const std::string &what = "ALL");
-  int DrawSecond(const std::string &what = "ALL");
-  int DrawHistory(const std::string &what = "ALL");
-  int FindHotTower(TPad *warn);
-  // int DrawDeadServer(TPad *transparent);
 
-  int TimeOffsetTicks = -1;
-  TCanvas *TC[3] = {nullptr};
-  TPad *transparent[3] = {nullptr};
-  TPad *Pad[6] = {nullptr};
-  TPad *warning[1] = {nullptr}; 
-  TGraphErrors *gr[2] = {nullptr};
-  OnlMonDB *dbvars = nullptr;
+ private:
+  int MakeCanvas(const std::string& name);
+  int DrawFirst(const std::string& what = "ALL");
+  int DrawSecond(const std::string& what = "ALL");
+  int DrawThird(const std::string& what = "ALL");
+  int DrawFourth(const std::string& what = "ALL");
+  int FindHotTower(TPad* warn, TH2*);
+  void DrawTowerAvg();
+  void DrawHitMap();
+  time_t getTime();
+  
+  // int DrawDeadServer(TPad *transparent);
+  std::string prefix = "HCALMON";
+  TCanvas* TC[9] = {nullptr};
+  TPad* transparent[9] = {nullptr};
+  TPad* Pad[18] = {nullptr};
+  TPad* warning[18] = {nullptr};
+  TGraphErrors* gr[2] = {nullptr};
+  TStyle* hcalStyle = nullptr;
 };
 
 #endif /* HCAL_HCALMONDRAW_H */
